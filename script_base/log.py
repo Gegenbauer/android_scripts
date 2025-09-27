@@ -9,23 +9,35 @@ except ImportError:
 
 class Logger:
     """
-    基于标准 logging 的单例日志器，支持自定义格式和异常堆栈。
+    Logger based on standard logging, supporting custom format and exception stack trace.
+    Each Logger instance is independent and can have its own format.
     """
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(Logger, cls).__new__(cls)
-        return cls._instance
-
-    def __init__(self, level=logging.INFO):
-        if hasattr(self, '_initialized'):
-            return
-        self.logger = logging.getLogger("project_logger")
+    def __init__(self, level=logging.DEBUG, simple=False, name=None):
+        # Use a unique logger name if not specified, to avoid handler/formatter sharing
+        if name is None:
+            name = f"project_logger_{id(self)}"
+        self.logger = logging.getLogger(name)
         self.logger.propagate = False
         self.set_level(level)
-        if not self.logger.handlers:
-            handler = logging.StreamHandler(sys.stdout)
+        # Remove all handlers to ensure formatter is always set as requested
+        while self.logger.handlers:
+            self.logger.handlers.pop()
+        handler = logging.StreamHandler(sys.stdout)
+        if simple:
+            if _USE_COLOR:
+                formatter = ColoredFormatter(
+                    "%(log_color)s%(message)s",
+                    log_colors={
+                        'DEBUG':    'cyan',
+                        'INFO':     'green',
+                        'WARNING':  'yellow',
+                        'ERROR':    'red',
+                        'CRITICAL': 'bold_red',
+                    }
+                )
+            else:
+                formatter = logging.Formatter("%(message)s")
+        else:
             if _USE_COLOR:
                 formatter = ColoredFormatter(
                     "%(log_color)s[%(asctime)s] [%(levelname)s] %(message)s",
@@ -43,9 +55,9 @@ class Logger:
                     "[%(asctime)s] [%(levelname)s] %(message)s",
                     datefmt="%Y-%m-%d %H:%M:%S"
                 )
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-        self._initialized = True
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        self._simple = simple
 
     def set_level(self, level):
         self.logger.setLevel(level)
@@ -65,8 +77,13 @@ class Logger:
         else:
             self.logger.error(message, *args, **kwargs)
 
-# 创建一个全局 logger 实例
+    @property
+    def simple(self):
+        return self._simple
+
+# Create a global logger instance
 logger = Logger()
+simple_logger = Logger(simple=True)
 
 # test
 if __name__ == "__main__":
@@ -74,3 +91,6 @@ if __name__ == "__main__":
     logger.warning("This is a warning message.")
     logger.error("This is an error message.")
     logger.debug("This is a debug message.")
+    simple_logger.info("This is a simple info message.")
+    print(f"simple_logger.simple: {simple_logger.simple}")
+    print(f"logger.simple: {logger.simple}")

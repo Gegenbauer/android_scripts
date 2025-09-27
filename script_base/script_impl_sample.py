@@ -5,45 +5,45 @@ from utils import get_current_timestamp, ensure_directory_exists
 from log import logger
 
 
-# --- 示例命令 1: GreetCommand ---
+# --- Example Command 1: GreetCommand ---
 class GreetCommand(Command):
     """
-    向指定的人打招呼。
+    Greet a specified person.
     """
     def add_arguments(self, parser: argparse.ArgumentParser):
-        parser.add_argument("--name", type=str, default="World", help="要打招呼的人名。")
-        parser.add_argument("-u", "--uppercase", action="store_true", help="将问候语转换为大写。")
+        parser.add_argument("--name", type=str, default="World", help="Name of the person to greet.")
+        parser.add_argument("-u", "--uppercase", action="store_true", help="Convert the greeting to uppercase.")
 
     def execute(self, args: argparse.Namespace):
         greeting = f"Hello, {args.name}!"
         if args.uppercase:
             greeting = greeting.upper()
         logger.info(greeting)
-        print(f"当前时间戳: {get_current_timestamp()}")
+        print(f"Current timestamp: {get_current_timestamp()}")
 
-# --- 示例命令 2: FileOpCommand ---
+# --- Example Command 2: FileOpCommand ---
 class FileOpCommand(Command):
     """
-    执行文件系统操作，例如创建目录。
+    Perform file system operations, such as creating directories.
     """
     def add_arguments(self, parser: argparse.ArgumentParser):
-        parser.add_argument("--path", type=str, required=True, help="要操作的路径。")
-        parser.add_argument("--create-dir", action="store_true", help="如果不存在则创建指定的目录。")
+        parser.add_argument("--path", type=str, required=True, help="Path to operate on.")
+        parser.add_argument("--create-dir", action="store_true", help="Create the specified directory if it does not exist.")
 
     def execute(self, args: argparse.Namespace):
         if args.create_dir:
             ensure_directory_exists(args.path)
-            logger.info(f"尝试创建目录: {args.path}")
+            logger.info(f"Attempting to create directory: {args.path}")
         else:
-            logger.info(f"对路径 '{args.path}' 执行其他文件操作。")
-            # 在这里可以添加更多的文件操作逻辑，例如读写文件等
-            print(f"文件操作在 {args.path} 上完成。")
+            logger.info(f"Performing other file operations on path '{args.path}'.")
+            # You can add more file operation logic here, such as reading/writing files, etc.
+            print(f"File operation completed on {args.path}.")
 
 if __name__ == "__main__":
-    manager = ScriptManager(description="一个简单的命令行脚本管理器。")
+    manager = ScriptManager(description="A simple command-line script manager.")
 
-    # 注册您的命令
-    manager.register_command("greet", GreetCommand(), help_text="向某人打招呼。")
-    manager.register_command("fileop", FileOpCommand(), help_text="执行文件系统操作。")
+    # Register your commands
+    manager.register_command("greet", GreetCommand(), help_text="Greet someone.")
+    manager.register_command("fileop", FileOpCommand(), help_text="Perform file system operations.")
 
     manager.run()

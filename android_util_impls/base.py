@@ -3,83 +3,81 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
-from script_base.utils import run_command
+from script_base.utils import run_command, find_key_contains
 from script_base.log import logger
+
 
 class AndroidUtilBase:
 
     def get_android_sdk_path(self) -> str:
         """
-        获取 Android SDK 的路径。
+        Get the path of the Android SDK.
 
         Returns:
-            str: Android SDK 的路径，如果未设置则返回空字符串。
+            str: The path of the Android SDK, or an empty string if not set.
         """
         sdk_path = os.environ.get("android_sdk_path", "")
         if not sdk_path:
-            logger.error("请设置 ANDROID_SDK_ROOT 环境变量以指向 Android SDK 的安装目录。")
+            logger.error("Please set the ANDROID_SDK_ROOT environment variable to point to the Android SDK installation directory.")
         if not os.path.exists(sdk_path):
             logger.error(
-                f"指定的 Android SDK 路径 '{sdk_path}' 不存在，请检查路径是否正确。"
+                f"The specified Android SDK path '{sdk_path}' does not exist. Please check if the path is correct."
             )
             return ""
         return sdk_path
 
-
     def get_android_ndk_path(self) -> str:
         """
-        获取 Android NDK 的路径。
+        Get the path of the Android NDK.
         Returns:
-            str: Android NDK 的路径，如果未设置则返回空字符串。
+            str: The path of the Android NDK, or an empty string if not set.
         """
         sdk_path = self.get_android_sdk_path()
         if not sdk_path:
             return ""
-        # ndk 路径为 sdk_path + '/ndk'
+        # NDK path is sdk_path + '/ndk'
         ndk_path = os.path.join(sdk_path, "ndk")
         if not os.path.exists(ndk_path):
             logger.error(
-                "请确保 Android NDK 已安装，并且 ANDROID_SDK_ROOT 环境变量指向正确的目录。"
+                "Please make sure the Android NDK is installed and ANDROID_SDK_ROOT points to the correct directory."
             )
             return ""
         return ndk_path
 
-
     def get_android_platform_tools_path(self) -> str:
         """
-        获取 Android 平台工具的路径。
+        Get the path of the Android platform tools.
         Returns:
-            str: Android 平台工具的路径，如果未设置则返回空字符串。
+            str: The path of the Android platform tools, or an empty string if not set.
         """
         sdk_path = self.get_android_sdk_path()
         if not sdk_path:
             return ""
-        # 平台工具路径为 sdk_path + '/platform-tools'
+        # Platform tools path is sdk_path + '/platform-tools'
         platform_tools_path = os.path.join(sdk_path, "platform-tools")
         if not os.path.exists(platform_tools_path):
             logger.error(
-                "请确保 Android SDK 已安装，并且 ANDROID_SDK_ROOT 环境变量指向正确的目录。"
+                "Please make sure the Android SDK is installed and ANDROID_SDK_ROOT points to the correct directory."
             )
             return ""
         return platform_tools_path
 
-
     def get_android_build_tools_path(self, version) -> str:
         """
-        获取 Android 构建工具的路径。
+        Get the path of the Android build tools.
         Args:
-            version (str): 构建工具的版本号，例如 '30'。
+            version (str): The version number of the build tools, e.g. '30'.
         Returns:
-            str: Android 构建工具的路径，如果未设置则返回空字符串。
+            str: The path of the Android build tools, or an empty string if not set.
         """
         sdk_path = self.get_android_sdk_path()
         if not sdk_path:
             return ""
         build_tools_path = os.path.join(sdk_path, "build-tools")
-        # 遍历 build-tools 目录，查找指定版本的构建工具，如果有 30.0.3，请求的是 30，认为匹配
+        # Traverse the build-tools directory to find the specified version. If there is 30.0.3 and the request is 30, consider it a match.
         if not os.path.exists(build_tools_path):
             logger.error(
-                "请确保 Android SDK 已安装，并且 ANDROID_SDK_ROOT 环境变量指向正确的目录。"
+                "Please make sure the Android SDK is installed and ANDROID_SDK_ROOT points to the correct directory."
             )
             return ""
         for item in os.listdir(build_tools_path):
@@ -88,16 +86,15 @@ class AndroidUtilBase:
                 if os.path.exists(build_tools_path):
                     return build_tools_path
         logger.error(
-            f"未找到 Android 构建工具版本 {version} 的路径，请检查是否已安装该版本。"
+            f"Could not find the path for Android build tools version {version}. Please check if this version is installed."
         )
         return ""
 
-
-    def get_adb_path(self, warning: bool = False) -> str:
+    def get_adb_path(self, warning: bool=False) -> str:
         """
-        获取 adb 工具的路径。
+        Get the path of the adb tool.
         Returns:
-            str: adb 工具的路径，如果未设置则返回空字符串。
+            str: The path of the adb tool, or an empty string if not set.
         """
         adb_path = (
             os.path.join(self.get_android_platform_tools_path(), "adb")
@@ -107,17 +104,16 @@ class AndroidUtilBase:
         if not adb_path or not os.path.exists(adb_path):
             if warning:
                 logger.error(
-                    "请确保 adb 工具已安装并在 ANDROID_PLATFORM_TOOLS_ROOT 环境变量指定的目录中。"
+                    "Please make sure the adb tool is installed and in the directory specified by ANDROID_PLATFORM_TOOLS_ROOT."
                 )
         return adb_path
 
-
-    def get_connected_devices(self, warningForAdb: bool = True) -> list:
+    def get_connected_devices(self, warningForAdb: bool=True) -> list:
         """
-        获取连接的 Android 设备列表。
+        Get the list of connected Android devices.
 
         Returns:
-            list: 连接的设备列表，每个设备为一个字符串，格式为 'device_id device_name'。
+            list: List of connected devices, each as a string in the format 'device_id device_name'.
         """
         adb_path = self.get_adb_path(warningForAdb)
         if not adb_path:
@@ -136,57 +132,55 @@ class AndroidUtilBase:
 
             return devices
         except Exception as e:
-            logger.error(f"获取连接的设备时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting connected devices: {e}", e)
             raise
 
-
-    # 获取可用的 adb 命令字符串
+    # Get the available adb command string
     def get_adb_command(
         self,
-        device: str, print_adb_warning: bool = True, print_device_warning: bool = True
+        device: str, print_adb_warning: bool=True, print_device_warning: bool=True
     ) -> str:
         """
-        返回形如 '/path/to/adb -s device' 的命令前缀。
-        - 如果 adb 路径无效，返回空字符串。
-        - 如果 device 在已连接设备中，返回对应 device。
-        - 如果 device 为空，返回第一个已连接设备。
-        - 如果无设备，返回空字符串。
-        - 如果 device 不在已连接设备中，返回第一个已连接设备，并可选打印警告。
+        Return a command prefix like '/path/to/adb -s device'.
+        - If the adb path is invalid, return an empty string.
+        - If the device is in the connected devices, return the corresponding device.
+        - If device is empty, return the first connected device.
+        - If no device, return an empty string.
+        - If device is not in the connected devices, return the first connected device and optionally print a warning.
         """
         adb_path = self.get_adb_path()
         if not adb_path:
             if print_adb_warning:
-                logger.warning("未检测到 adb 工具，请检查环境变量和 SDK 配置。")
+                logger.warning("adb tool not detected, please check environment variables and SDK configuration.")
             return ""
         devices = self.get_connected_devices(warningForAdb=False)
         device_ids = [d.split()[0] for d in devices if d.strip()]
         if not device_ids:
             if print_device_warning:
-                logger.warning("未检测到任何已连接的 Android 设备。")
+                logger.warning("No connected Android devices detected.")
             return ""
         if device and device in device_ids:
             return f"{adb_path} -s {device}"
         if device and device not in device_ids:
             if print_device_warning:
                 logger.warning(
-                    f"指定的设备 {device} 未连接，使用第一个已连接设备 {device_ids[0]} 代替。"
+                    f"The specified device {device} is not connected, using the first connected device {device_ids[0]} instead."
                 )
             return f"{adb_path} -s {device_ids[0]}"
-        # device 为空，返回第一个
+        # If device is empty, return the first one
         return f"{adb_path} -s {device_ids[0]}"
-
 
     def pull_file(self, device: str, remote_path: str, local_path: str) -> bool:
         """
-        从 Android 设备拉取文件到本地。
+        Pull a file from an Android device to the local machine.
 
         Args:
-            device (str): 设备的 ID。
-            remote_path (str): 设备上的文件路径。
-            local_path (str): 本地保存路径。
+            device (str): The ID of the device.
+            remote_path (str): The file path on the device.
+            local_path (str): The local save path.
 
         Returns:
-            bool: 拉取是否成功。
+            bool: Whether the pull was successful.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -196,21 +190,20 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"从设备 {device} 拉取文件失败: {e}", e)
+            logger.error(f"Failed to pull file from device {device}: {e}", e)
             return False
-
 
     def push_file(self, device: str, local_path: str, remote_path: str) -> bool:
         """
-        将本地文件推送到 Android 设备。
+        Push a local file to an Android device.
 
         Args:
-            device (str): 设备的 ID。
-            local_path (str): 本地文件路径。
-            remote_path (str): 设备上的保存路径。
+            device (str): The ID of the device.
+            local_path (str): The local file path.
+            remote_path (str): The save path on the device.
 
         Returns:
-            bool: 推送是否成功。
+            bool: Whether the push was successful.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -220,19 +213,18 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"向设备 {device} 推送文件失败: {e}", e)
+            logger.error(f"Failed to push file to device {device}: {e}", e)
             return False
 
-
-    def is_rooted(self, device: str = "") -> bool:
+    def is_rooted(self, device: str="") -> bool:
         """
-        检查设备是否已获得 root 权限。
+        Check if the device has root access.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            bool: 是否已获得 root 权限。
+            bool: Whether the device has root access.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -244,19 +236,18 @@ class AndroidUtilBase:
             )
             return "uid=0(root)" in result
         except Exception as e:
-            logger.error(f"检查设备 {device} 是否为 root 用户时发生错误: {e}", e)
+            logger.error(f"Error occurred while checking if device {device} is rooted: {e}", e)
             return False
 
-
-    def run_adb_as_root(self, device: str = "") -> bool:
+    def run_adb_as_root(self, device: str="") -> bool:
         """
-        以 root 权限重新启动 adb 服务。
+        Restart the adb service with root privileges.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            bool: 是否成功获取 root 权限。
+            bool: Whether root access was successfully obtained.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -266,19 +257,18 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"在设备 {device} 上获取 root 权限失败: {e}", e)
+            logger.error(f"Failed to obtain root access on device {device}: {e}", e)
             return False
 
-
-    def is_adb_running_as_root(self, device: str = "") -> bool:
+    def is_adb_running_as_root(self, device: str="") -> bool:
         """
-        检查 adb 是否以 root 身份运行。
+        Check if adb is running as root.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            bool: 是否已获得 root 权限。
+            bool: Whether adb is running as root.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -288,19 +278,18 @@ class AndroidUtilBase:
             result = run_command(command, check_output=True, shell=True)
             return "uid=0(root)" in result
         except Exception as e:
-            logger.error(f"检查设备 {device} 是否为 root 用户时发生错误: {e}", e)
+            logger.error(f"Error occurred while checking if adb is running as root on device {device}: {e}", e)
             return False
-
 
     def remount(self, device: str) -> bool:
         """
-        重新挂载系统分区为可读写。
+        Remount the system partition as read-write.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            bool: 是否成功重新挂载。
+            bool: Whether the remount was successful.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -310,19 +299,18 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"在设备 {device} 上重新挂载系统分区失败: {e}", e)
+            logger.error(f"Failed to remount the system partition on device {device}: {e}", e)
             return False
-
 
     def has_remount(self, device: str) -> bool:
         """
-        检查设备是否支持重新挂载系统分区。
+        Check if the device supports remounting the system partition.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            bool: 是否支持重新挂载。
+            bool: Whether remounting is supported.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -332,19 +320,18 @@ class AndroidUtilBase:
             result = run_command(command, check_output=True, shell=True)
             return "rw" in result
         except Exception as e:
-            logger.error(f"检查设备 {device} 是否支持重新挂载时发生错误: {e}", e)
+            logger.error(f"Error occurred while checking if device {device} supports remounting: {e}", e)
             return False
-
 
     def get_device_sdk_version(self, device="") -> str:
         """
-        获取连接的 Android 设备的 SDK 版本。
+        Get the SDK version of the connected Android device.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            str: 设备的 SDK 版本，如果未找到则返回空字符串。
+            str: The SDK version of the device, or an empty string if not found.
         """
         adb_cmd = self.get_adb_command(device, print_adb_warning=True, print_device_warning=True)
         if not adb_cmd:
@@ -354,19 +341,18 @@ class AndroidUtilBase:
             result = run_command(command, check_output=True, shell=True)
             return result.strip()
         except Exception as e:
-            logger.error(f"获取设备 SDK 版本时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting the SDK version of the device: {e}", e)
             raise
-        
         
     def get_device_brand(self, device="") -> str:
         """
-        获取连接的 Android 设备的品牌信息。
+        Get the brand information of the connected Android device.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            str: 设备的品牌信息，如果未找到则返回空字符串。
+            str: The brand information of the device, or an empty string if not found.
         """
         adb_cmd = self.get_adb_command(device, print_adb_warning=True, print_device_warning=True)
         if not adb_cmd:
@@ -376,19 +362,18 @@ class AndroidUtilBase:
             result = run_command(command, check_output=True, shell=True)
             return result.strip()
         except Exception as e:
-            logger.error(f"获取设备品牌信息时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting the brand information of the device: {e}", e)
             raise
-
 
     def get_focused_app_package(self, device="") -> str:
         """
-        获取当前聚焦的应用程序包名。
+        Get the package name of the currently focused application.
 
         Args:
-        device (str): 设备的 ID。
+        device (str): The ID of the device.
 
         Returns:
-            str: 当前聚焦的应用程序包名，如果未找到则返回空字符串。
+            str: The package name of the currently focused application, or an empty string if not found.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -397,8 +382,7 @@ class AndroidUtilBase:
             command = f'{adb_cmd} shell "dumpsys activity activities|grep mFocusedApp"'
             result = run_command(command, check_output=True, shell=True)
             focused_app = ""
-            print(result)
-            # 逐行检查输出，找到包含 mFocusedApp 且，= 后面不为 null 的行
+            # Check the output line by line to find the line containing mFocusedApp and not null after =
             for line in result.splitlines():
                 if "mFocusedApp" in line and "=null" not in line:
                     focused_app = line.strip()
@@ -413,20 +397,19 @@ class AndroidUtilBase:
                     return match.group(1)
             return ""
         except Exception as e:
-            logger.error(f"获取当前聚焦应用程序包名时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting the package name of the currently focused application: {e}", e)
             raise
         return ""
 
-
     def get_focused_activity(self, device="") -> str:
         """
-        获取当前聚焦的 Activity 名称。
+        Get the name of the currently focused Activity.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            str: 当前聚焦的 Activity 名称，如果未找到则返回空字符串。
+            str: The name of the currently focused Activity, or an empty string if not found.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -435,7 +418,7 @@ class AndroidUtilBase:
             command = f'{adb_cmd} shell "dumpsys activity activities | grep mFocusedApp"'
             result = run_command(command, shell=True, check_output=True)
             # mFocusedApp=ActivityRecord{def7ea1 u0 com.android.launcher3/.Launcher t55}
-            # 获得 com.android.launcher3/.Launcher
+            # Get com.android.launcher3/.Launcher
             for line in result.splitlines():
                 if "mFocusedApp" in line and "=null" not in line:
                     import re
@@ -445,25 +428,24 @@ class AndroidUtilBase:
                     match = re.search(pattern, line)
 
                     if match:
-                        # group(1) 获取第一个捕获组的内容
+                        # group(1) gets the content of the first capture group
                         focused_activity = match.group(1)
                         return focused_activity
                     break
             return ""
         except Exception as e:
-            logger.error(f"获取当前聚焦 Activity 名称时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting the name of the currently focused Activity: {e}", e)
             raise
-
 
     def get_focused_window(self, device="") -> str:
         """
-        获取当前聚焦的窗口名称。
+        Get the name of the currently focused window.
 
         Args:
-            device (str): 设备的 ID。
+            device (str): The ID of the device.
 
         Returns:
-            str: 当前聚焦的窗口名称，如果未找到则返回空字符串。
+            str: The name of the currently focused window, or an empty string if not found.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -479,21 +461,52 @@ class AndroidUtilBase:
                     return window_info
             return ""
         except Exception as e:
-            logger.error(f"获取当前聚焦窗口名称时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting the name of the currently focused window: {e}", e)
             raise
         return ""
+    
+    def get_resumed_fragment(self, device="") -> str:
+        """
+        Get the name of the currently focused Fragment.
 
+        Args:
+            device (str): The ID of the device.
+
+        Returns:
+            str: The name of the currently focused Fragment, or an empty string if not found.
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return ""
+        try:
+            focused_package = self.get_focused_app_package(device)
+            if not focused_package:
+                return ""
+            command = f"adb shell \"dumpsys activity {focused_package}|grep 'mResumed=true'\""
+            result = run_command(command, shell=True, check_output=True)
+            # Find the part containing "Active Fragments" and extract SoundSettings
+            # mCreated=true mResumed=true mStopped=false    Active Fragments:    SoundSettings{985054f} (287240d6-e623-4d37-859a-3fec6fc3d8f4) id=0x7f0a02b6}
+            for line in result.splitlines():
+                if "Active Fragments" in line:
+                    import re
+                    match = re.search(r"Active Fragments:\s+([^\s{]+)", line)
+                    if match:
+                        return match.group(1)
+            return ""
+        except Exception as e:
+            logger.error(f"Error occurred while getting the name of the currently focused Fragment: {e}", e)
+            raise
 
     def find_apk_path(self, keyword: str, device="") -> list:
         """
-        查找包含指定关键字的 APK 文件路径。每一项包含包名和 APK 路径。
+        Find the APK file paths containing the specified keyword. Each item contains the package name and APK path.
 
         Args:
-            keyword (str): 要搜索的关键字。
-            device (str): 设备的 ID（可选）。
+            keyword (str): The keyword to search for.
+            device (str): The ID of the device (optional).
 
         Returns:
-            list: 包含指定关键字的 APK 文件路径列表。
+            list: List of APK file paths containing the specified keyword.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -511,21 +524,20 @@ class AndroidUtilBase:
                         apk_paths.append((package_name, apk_path))
             return apk_paths
         except Exception as e:
-            logger.error(f"查找 APK 路径时发生错误: {e}", e)
+            logger.error(f"Error occurred while finding APK paths: {e}", e)
             raise
         return []
 
-
-    def get_app_version(self, package_name: str, device: str = "") -> str:
+    def get_app_version(self, package_name: str, device: str="") -> str:
         """
-        获取指定应用程序的版本名称。
+        Get the version name of the specified application.
 
         Args:
-            package_name (str): 要查询的应用程序包名。
-            device (str): 设备的 ID（可选）。
+            package_name (str): The package name of the application to query.
+            device (str): The ID of the device (optional).
 
         Returns:
-            str: 应用程序的版本名称，如果未找到则返回空字符串。
+            str: The version name of the application, or an empty string if not found.
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
@@ -536,30 +548,29 @@ class AndroidUtilBase:
                 f'{adb_command} shell "dumpsys package {package_name} | grep versionName"'
             )
             result = run_command(command, check_output=True, shell=True)
-            # result 可能包含多行，取第一行
+            # result may contain multiple lines, take the first line
             first_line = result.splitlines()[0] if result else ""
-            # first_line 格式为: versionName=1.2.3
+            # first_line format: versionName=1.2.3
             if first_line and "versionName=" in first_line:
                 version_name = first_line.split("=")[1].strip()
                 return version_name
-            logger.info(f"未找到应用程序 {package_name} 的版本名称。")
+            logger.info(f"Version name of application {package_name} not found.")
         except Exception as e:
-            logger.error(f"获取应用程序 {package_name} 版本名称时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting the version name of application {package_name}: {e}", e)
             raise
 
         return ""
 
-
     def clear_app_data(self, package_name: str, device="") -> bool:
         """
-        清除指定应用程序的数据。
+        Clear the data of the specified application.
 
         Args:
-            package_name (str): 要清除数据的应用程序包名。
-            device (str): 设备的 ID。
+            package_name (str): The package name of the application to clear data for.
+            device (str): The ID of the device.
 
         Returns:
-            bool: 如果成功清除数据则返回 True，否则返回 False。
+            bool: Whether the data was successfully cleared.
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
@@ -570,20 +581,19 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"清除应用程序 {package_name} 数据时发生错误: {e}", e)
+            logger.error(f"Error occurred while clearing data for application {package_name}: {e}", e)
             raise
 
-
-    def set_debugger_app(self, package_name: str, device: str = "") -> bool:
+    def set_debugger_app(self, package_name: str, device: str="") -> bool:
         """
-        设置指定应用程序为调试应用程序。
+        Set the specified application as the debugger application.
 
         Args:
-            package_name (str): 要设置为调试应用程序的包名。
-            device (str): 设备的 ID（可选）。
+            package_name (str): The package name of the application to set as the debugger application.
+            device (str): The ID of the device (optional).
 
         Returns:
-            bool: 如果成功设置则返回 True，否则返回 False。
+            bool: Whether the application was successfully set as the debugger application.
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
@@ -594,21 +604,20 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"设置应用程序 {package_name} 为调试应用程序时发生错误: {e}", e)
+            logger.error(f"Error occurred while setting application {package_name} as the debugger application: {e}", e)
             raise
 
         return False
 
-
     def remove_debugger_app(self, device="") -> bool:
         """
-        移除当前设置的调试应用程序。
+        Remove the currently set debugger application.
 
         Args:
-            device (str): 设备的 ID（可选）。
+            device (str): The ID of the device (optional).
 
         Returns:
-            bool: 如果成功移除则返回 True，否则返回 False。
+            bool: Whether the debugger application was successfully removed.
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
@@ -619,57 +628,57 @@ class AndroidUtilBase:
             run_command(command, ignore_command_error=True, shell=True)
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"移除调试应用程序时发生错误: {e}", e)
+            logger.error(f"Error occurred while removing the debugger application: {e}", e)
             raise
 
         return False
 
-
-    def get_pid_of_app(self, package_name: str, device="") -> str:
+    def get_pid_of_app(self, package_name: str, device="") -> int:
         """
-        获取指定应用程序的进程 ID (PID)。
+        Get the process ID (PID) of the specified application.
 
         Args:
-            package_name (str): 要获取 PID 的应用程序包名。
-            device (str): 设备的 ID（可选）。
+            package_name (str): The package name of the application to get the PID for.
+            device (str): The ID of the device (optional).
 
         Returns:
-            str: 应用程序的 PID，如果未找到则返回空字符串。
+            int: The PID of the application, or -1 if not found.
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
-            return False
+            return -1
 
         try:
             command = f"{adb_command} shell pidof {package_name}"
             result = run_command(
                 command, shell=True, check_output=True, ignore_command_error=True
             )
-            pid = result.strip()
-            if pid:
+            # check if result is a number
+            
+            if result.strip().isdigit():
+                pid = int(result.strip())
                 return pid
             else:
-                logger.info(f"未找到应用程序 {package_name} 的 PID。")
+                logger.info(f"PID of application {package_name} not found.")
         except subprocess.CalledProcessError:
-            logger.info(f"未找到应用程序 {package_name} 的 PID。")
-            return ""
+            logger.info(f"PID of application {package_name} not found.")
+            return -1
         except Exception as e:
-            logger.error(f"获取应用程序 {package_name} 的 PID 时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting the PID of application {package_name}: {e}", e)
             raise
 
-        return ""
-
+        return -1
 
     def get_app_version_code(self, package_name: str, device="") -> str:
         """
-        获取指定应用程序的版本代码。
+        Get the version code of the specified application.
 
         Args:
-            package_name (str): 要查询的应用程序包名。
-            device (str): 设备的 ID（可选）。
+            package_name (str): The package name of the application to query.
+            device (str): The ID of the device (optional).
 
         Returns:
-            str: 应用程序的版本代码，如果未找到则返回空字符串。
+            str: The version code of the application, or an empty string if not found.
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
@@ -680,29 +689,27 @@ class AndroidUtilBase:
                 f'{adb_command} shell "dumpsys package {package_name} | grep versionCode"'
             )
             result = run_command(command, shell=True, check_output=True)
-            # result 可能包含多行，取第一行
+            # result may contain multiple lines, take the first line
             first_line = result.splitlines()[0] if result else ""
-            # first_line 格式为: versionCode=123 minSdk=21 targetSdk=30
+            # first_line format: versionCode=123 minSdk=21 targetSdk=30
             if first_line and "versionCode=" in first_line:
                 version_code = first_line.split("=")[1].split()[0].strip()
                 return version_code
-            logger.info(f"未找到应用程序 {package_name} 的版本代码。")
+            logger.info(f"Version code of application {package_name} not found.")
         except Exception as e:
-            logger.error(f"获取应用程序 {package_name} 版本代码时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting the version code of application {package_name}: {e}", e)
             raise
 
         return ""
 
-
-    def is_valid_time_format(self,time_str):
+    def is_valid_time_format(self, time_str):
         import re
 
         pattern = r"^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}$"
         return re.match(pattern, time_str)
 
-
     def get_device_timezone_name(self, device="") -> str:
-        """从设备获取 IANA 时区名称，例如 'America/New_York'"""
+        """Get the IANA timezone name from the device, e.g. 'America/New_York'"""
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
@@ -714,30 +721,29 @@ class AndroidUtilBase:
             )
             tz_name = result.strip()
             if not tz_name:
-                logger.error("错误: 未能从设备获取时区名称。", e)
+                logger.error("Error: Failed to get timezone name from device.", e)
                 return None
             return tz_name
         except Exception as e:
-            logger.error(f"错误: 获取设备时区失败: {e}", e)
+            logger.error(f"Error: Failed to get device timezone: {e}", e)
             raise
-
 
     def get_utc_milliseconds_from_device(self, local_time_str, tz_name, device="") -> int:
         """
-        让设备使用其自身的时区数据库将本地时间转换为 UTC 毫秒。
+        Let the device use its own timezone database to convert local time to UTC milliseconds.
         """
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
                 return False
-            # 格式化时间以适配 'date -d' 命令
-            # local_time_str 格式为 "YYYY-MM-DD-HH-MM-SS"
-            # 转换为 "YYYY-MM-DD HH:MM:SS"
+            # Format the time to fit the 'date -d' command
+            # local_time_str format is "YYYY-MM-DD-HH-MM-SS"
+            # Convert to "YYYY-MM-DD HH:MM:SS"
             date_part = local_time_str[:10]  # "YYYY-MM-DD"
             time_part = local_time_str[11:].replace("-", ":")  # "HH:MM:SS"
             date_input_str = f"{date_part} {time_part}"
-            # 构造命令: TZ='<tz_name>' date -d '<time_str>' +%s
-            # 这会强制 date 命令在指定时区下解析时间，并输出 UTC 秒数
+            # Construct the command: TZ='<tz_name>' date -d '<time_str>' +%s
+            # This forces the date command to parse the time in the specified timezone and output UTC seconds
             command = (
                 f"{adb_command} shell \"TZ='{tz_name}' date -d '{date_input_str}' +%s\""
             )
@@ -746,18 +752,17 @@ class AndroidUtilBase:
             return utc_seconds * 1000
         except ValueError as e:
             logger.error(
-                f"错误: 无法将设备返回的 '{utc_seconds_str.strip()}' 解析为整数。", e
+                f"Error: Failed to parse '{utc_seconds_str.strip()}' returned by the device as an integer.", e
             )
             raise
         except Exception as e:
-            logger.error(f"错误: 在设备上转换时间失败: {e}", e)
-            logger.error("请检查设备上的 'date' 命令是否支持 '-d' 选项。")
+            logger.error(f"Error: Failed to convert time on device: {e}", e)
+            logger.error("Please check if the 'date' command on the device supports the '-d' option.")
             raise
 
-
     def get_device_cpu_cores_count(self, device="") -> int:
-        """获取设备的 CPU 核心数"""
-        # /sys/devices/system/cpu 目录下会有 cpuX 目录，X 为核心编号
+        """Get the number of CPU cores on the device"""
+        # The /sys/devices/system/cpu directory will have cpuX directories, where X is the core number
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
@@ -767,7 +772,7 @@ class AndroidUtilBase:
                 check_output=True,
                 shell=True,
             )
-            # 检查哪个目录名称是 cpu[0-9]，后面必须跟数字
+            # Check which directory names are cpu[0-9], followed by a number
             import re
 
             cpu_dirs = [
@@ -778,25 +783,24 @@ class AndroidUtilBase:
             cpu_cores = len(cpu_dirs)
             return cpu_cores
         except Exception as e:
-            logger.error(f"错误: 获取设备 CPU 核心数失败: {e}", e)
+            logger.error(f"Error: Failed to get the number of CPU cores on the device: {e}", e)
             raise
-
 
     def get_biggest_cpu_core(self, device="") -> int:
         """
-        获取设备的最大 CPU 核心编号
+        Get the highest CPU core number on the device
 
-        return 大于 0 的整数
+        return an integer greater than 0
         """
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
                 return 0
             # /sys/devices/system/cpu/cpu{i}/cpufreq/cpuinfo_max_freq
-            # 查看所有 cpuinfo_max_freq 文件内容，他是一个整数，表明该核心的最大频率
+            # Check the contents of all cpuinfo_max_freq files, which is an integer indicating the maximum frequency of the core
             max_freqs = []
             cpu_cores = self.get_device_cpu_cores_count(device)
-            # 检查文件是否存在
+            # Check if the file exists
             freq_file_check = run_command(
                 f"{adb_command} shell ls /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
                 check_output=True,
@@ -807,7 +811,7 @@ class AndroidUtilBase:
                 return 0
             for i in range(cpu_cores):
                 try:
-                    # 读取文件内容
+                    # Read the file contents
                     freq = run_command(
                         f"{adb_command} shell cat /sys/devices/system/cpu/cpu{i}/cpufreq/cpuinfo_max_freq",
                         check_output=True,
@@ -815,16 +819,15 @@ class AndroidUtilBase:
                     )
                     max_freqs.append(int(freq.strip()))
                 except Exception as e:
-                    logger.error(f"错误: 获取 CPU{i} 最大频率失败: {e}", e)
+                    logger.error(f"Error: Failed to get the maximum frequency of CPU{i}: {e}", e)
             biggest_core = max(max_freqs) if max_freqs else 0
             return biggest_core
         except Exception as e:
-            logger.error(f"错误: 获取设备最大 CPU 核心失败: {e}", e)
+            logger.error(f"Error: Failed to get the highest CPU core on the device: {e}", e)
             raise
 
-
     def get_device_architecture(self, device="") -> str:
-        """获取设备的 CPU 架构信息"""
+        """Get the CPU architecture information of the device"""
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
@@ -837,36 +840,33 @@ class AndroidUtilBase:
             arch = result.strip()
             return arch
         except Exception as e:
-            logger.error(f"错误: 获取设备 CPU 架构失败: {e}", e)
+            logger.error(f"Error: Failed to get the CPU architecture of the device: {e}", e)
             raise
-
 
     def get_device_cpu_model(self, device="") -> str:
-        """获取设备的 CPU 型号信息"""
+        """Get the CPU model information of the device"""
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
                 return ""
-            return "暂未实现"
+            return "Not implemented yet"
         except Exception as e:
-            logger.error(f"错误: 获取设备 CPU 型号失败: {e}", e)
+            logger.error(f"Error: Failed to get the CPU model of the device: {e}", e)
             raise
-
 
     def get_device_gpu_model(self, device="") -> str:
-        """获取设备的 GPU 型号信息"""
+        """Get the GPU model information of the device"""
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
                 return ""
-            return "暂未实现"
+            return "Not implemented yet"
         except Exception as e:
-            logger.error(f"错误: 获取设备 GPU 型号失败: {e}", e)
+            logger.error(f"Error: Failed to get the GPU model of the device: {e}", e)
             raise
 
-
     def get_device_opengl_es_version(self, device="") -> str:
-        """获取设备的 OpenGL ES 版本信息"""
+        """Get the OpenGL ES version information of the device"""
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
@@ -879,12 +879,11 @@ class AndroidUtilBase:
             opengl_es_version = result.strip()
             return opengl_es_version
         except Exception as e:
-            logger.error(f"错误: 获取设备 OpenGL ES 版本失败: {e}", e)
+            logger.error(f"Error: Failed to get the OpenGL ES version of the device: {e}", e)
             raise
 
-
     def set_night_mode(self, mode: str, device="") -> bool:
-        """设置设备的夜间模式"""
+        """Set the night mode of the device"""
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
@@ -896,20 +895,19 @@ class AndroidUtilBase:
             )
             return True
         except Exception as e:
-            logger.error(f"错误: 设置设备夜间模式失败: {e}", e)
+            logger.error(f"Error: Failed to set the night mode of the device: {e}", e)
             return False
-
 
     def grant_permission(self, permission: str, package_name: str, device="") -> bool:
         """
-        授予设备指定的权限。
+        Grant the specified permission to the device.
 
         Args:
-            device (str): 设备的 ID。
-            permission (str): 要授予的权限。
+            device (str): The ID of the device.
+            permission (str): The permission to grant.
 
         Returns:
-            bool: 是否成功授予权限。
+            bool: Whether the permission was successfully granted.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -919,83 +917,79 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"在设备 {device} 上授予权限 {permission} 失败: {e}", e)
+            logger.error(f"Failed to grant permission {permission} on device {device}: {e}", e)
             return False
-
 
     def check_permission(self, permission: str, package_name: str, device="") -> bool:
         """
-        检查设备是否已授予指定的权限。
+        Check if the specified permission has been granted to the device.
 
         Args:
-            device (str): 设备的 ID。
-            permission (str): 要检查的权限。
-            package_name (str): 要检查的应用的包名。
+            device (str): The ID of the device.
+            permission (str): The permission to check.
+            package_name (str): The package name of the application to check.
 
         Returns:
-            bool: 是否已授予权限。
+            bool: Whether the permission has been granted.
         """
         # TODO
 
-
     def is_persistent_app(self, package_name: str, device="") -> bool:
         """
-        检查设备上指定的应用是否为持久化应用。
+        Check if the specified application is a persistent app on the device.
 
         Args:
-            device (str): 设备的 ID。
-            package_name (str): 要检查的应用的包名。
+            device (str): The ID of the device.
+            package_name (str): The package name of the application to check.
 
         Returns:
-            bool: 是否为持久化应用。
+            bool: Whether the application is a persistent app.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
             return False
         try:
-            # TODO 暂未实现
+            # TODO Not implemented yet
             return False
         except Exception as e:
             logger.error(
-                f"在设备 {device} 上检查应用 {package_name} 是否为持久化应用失败: {e}", e
+                f"Failed to check if application {package_name} is a persistent app on device {device}: {e}", e
             )
             return False
 
-
     def kill_process(self, package_name: str, device="") -> bool:
         """
-        杀死设备上指定的进程。
+        Kill the specified process on the device.
 
         Args:
-            device (str): 设备的 ID。
-            package_name (str): 要杀死的进程的包名。
+            device (str): The ID of the device.
+            package_name (str): The package name of the process to kill.
 
         Returns:
-            bool: 是否成功杀死进程。
+            bool: Whether the process was successfully killed.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
             return False
         try:
-            # TODO 确认是否需要区分 persistent app
+            # TODO Confirm if persistent app needs to be distinguished
             command = f"{adb_cmd} shell am force-stop {package_name}"
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"在设备 {device} 上杀死进程 {package_name} 失败: {e}", e)
+            logger.error(f"Failed to kill process {package_name} on device {device}: {e}", e)
             return False
-
 
     def uninstall_app(self, package_name: str, device="") -> bool:
         """
-        卸载设备上的应用。
+        Uninstall the application on the device.
 
         Args:
-            device (str): 设备的 ID。
-            package_name (str): 要卸载的应用的包名。
+            device (str): The ID of the device.
+            package_name (str): The package name of the application to uninstall.
 
         Returns:
-            bool: 是否成功卸载应用。
+            bool: Whether the application was successfully uninstalled.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -1005,46 +999,48 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"在设备 {device} 上卸载应用 {package_name} 失败: {e}", e)
+            logger.error(f"Failed to uninstall application {package_name} on device {device}: {e}", e)
             return False
-
 
     def force_gc(self, package_name: str, device="") -> bool:
         """
-        强制进行垃圾回收。
+        Force garbage collection.
 
         Args:
-            device (str): 设备的 ID。
-            package_name (str): 要进行垃圾回收的应用的包名。
+            device (str): The ID of the device.
+            package_name (str): The package name of the application to perform garbage collection for.
 
         Returns:
-            bool: 是否成功进行垃圾回收。
+            bool: Whether garbage collection was successfully performed.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
             return False
         try:
-            command = f"{adb_cmd} shell kill -10 {self.get_pid_of_app(package_name)}"
+            pid = self.get_pid_of_app(package_name, device)
+            if pid == -1:
+                logger.error(f"Cannot perform garbage collection: Application {package_name} is not running on device {device}.")
+                return False
+            command = f"{adb_cmd} shell kill -10 {pid}"
             run_command(command, shell=True)
             return True
         except PermissionError as e:
             logger.error(str(e))
             return False
         except Exception as e:
-            logger.error(f"在设备 {device} 上强制进行垃圾回收失败: {e}", e)
+            logger.error(f"Failed to force garbage collection on device {device}: {e}", e)
             return False
 
-
-    def is_remote_path_file(self, remote_path: str, device: str = "") -> bool:
+    def is_remote_path_file(self, remote_path: str, device: str="") -> bool:
         """
-        检查设备上的远程路径是否为文件。
+        Check if the remote path on the device is a file.
 
         Args:
-            device (str): 设备的 ID。
-            remote_path (str): 远程路径。
+            device (str): The ID of the device.
+            remote_path (str): The remote path.
 
         Returns:
-            bool: 如果是文件则返回 True，否则返回 False。
+            bool: Whether the remote path is a file.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -1055,21 +1051,20 @@ class AndroidUtilBase:
             return result.strip() == "true"
         except Exception as e:
             logger.error(
-                f"检查设备 {device} 上的路径 {remote_path} 是否为文件时发生错误: {e}", e
+                f"Error occurred while checking if the path {remote_path} on device {device} is a file: {e}", e
             )
             return False
 
-
-    def is_remote_path_directory(self, remote_path: str, device: str = "") -> bool:
+    def is_remote_path_directory(self, remote_path: str, device: str="") -> bool:
         """
-        检查设备上的远程路径是否为目录。
+        Check if the remote path on the device is a directory.
 
         Args:
-            device (str): 设备的 ID。
-            remote_path (str): 远程路径。
+            device (str): The ID of the device.
+            remote_path (str): The remote path.
 
         Returns:
-            bool: 如果是目录则返回 True，否则返回 False。
+            bool: Whether the remote path is a directory.
         """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
@@ -1080,10 +1075,9 @@ class AndroidUtilBase:
             return result.strip() == "true"
         except Exception as e:
             logger.error(
-                f"检查设备 {device} 上的路径 {remote_path} 是否为目录时发生错误: {e}", e
+                f"Error occurred while checking if the path {remote_path} on device {device} is a directory: {e}", e
             )
             return False
-
 
     def parse_dumpsys_output(self, text: str) -> dict:
         """
@@ -1158,16 +1152,15 @@ class AndroidUtilBase:
         # Return the first key of the root, which contains the parsed data
         return root["_root_"]
 
-
     def get_all_permissions(self, device="") -> list:
         """
-        获取设备上所有已安装应用的权限信息。
+        Get the permission information of all installed applications on the device.
 
         Args:
-            device (str): 设备的 ID（可选）。
+            device (str): The ID of the device (optional).
 
         Returns:
-            list: 包含所有应用权限信息的列表， item 类型为 PermissionInfo
+            list: List containing all application permission information, item type is PermissionInfo
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
@@ -1177,18 +1170,18 @@ class AndroidUtilBase:
             command = f"{adb_command} shell dumpsys package permissions"
             result = run_command(command, check_output=True, shell=True)
             parsed_data = self.parse_dumpsys_output(result)
-            # 找到最外层的两个节点，分别是 Permissions 和 AppOp Permissions
+            # Find the two outermost nodes, Permissions and AppOp Permissions
             permissions_node = parsed_data.get("Permissions", {})
             appop_permissions_node = parsed_data.get("AppOp Permissions", {})
-            # 解析 Permissions 节点
-            #"Permission [android.permission.ACCESS_DOWNLOAD_MANAGER_ADVANCED] (ddb6b8e)": {
+            # Parse the Permissions node
+            # "Permission [android.permission.ACCESS_DOWNLOAD_MANAGER_ADVANCED] (ddb6b8e)": {
             #    "sourcePackage": "com.android.providers.downloads",
             #    "uid": "10003 gids=null type=0 prot=signature|privileged",
             #    "perm": "Permission{f063faf android.permission.ACCESS_DOWNLOAD_MANAGER_ADVANCED}"
-            #},
+            # },
             package_permissions = []
             for key, value in permissions_node.items():
-                # 使用正则表达式提取权限名称
+                # Use regular expressions to extract the permission name
                 import re
                 match = re.match(r"Permission \[(.+?)\]", key)
                 if match:
@@ -1205,12 +1198,12 @@ class AndroidUtilBase:
                             prot=prot,
                         )
                     )
-            # 解析 AppOp Permissions 节点
-            #"AppOp Permissions": {
+            # Parse the AppOp Permissions node
+            # "AppOp Permissions": {
             #    "AppOp Permission android.permission.WRITE_SETTINGS": {
             #        "com.mega.calendar": "com.mega.calendar",
             #    }
-            #}
+            # }
             app_op_permissions = {}
             for key, value in appop_permissions_node.items():
                 if key.startswith("AppOp Permission "):
@@ -1221,13 +1214,111 @@ class AndroidUtilBase:
                             name=permission_name
                         )
                     )
-            # 合并结果
+            # Merge results
             return package_permissions
         except Exception as e:
-            logger.error(f"获取设备上所有应用权限信息时发生错误: {e}", e)
+            logger.error(f"Error occurred while getting all application permission information on the device: {e}", e)
             raise
         
+    def check_file_or_directory_exists(self, remote_path: str, device="") -> bool:
+        """
+        Check if the specified file or directory exists on the device.
+
+        Args:
+            device (str): The ID of the device.
+            remote_path (str): The remote path to check.
+        Returns:
+            bool: Whether the file or directory exists.
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return False
+        try:
+            command = f"{adb_cmd} shell [ -e {remote_path} ] && echo 'true' || echo 'false'"
+            result = run_command(command, check_output=True, shell=True)
+            return result.strip() == "true"
+        except Exception as e:
+            logger.error(
+                f"Error occurred while checking if the path {remote_path} on device {device} exists: {e}", e
+            )
+            return False
+        
+    def delete_file_or_directory(self, remote_path: str, device="") -> bool:
+        """
+        Delete the specified file or directory on the device.
+
+        Args:
+            device (str): The ID of the device.
+            remote_path (str): The remote path to delete.
+        Returns:
+            bool: Whether the file or directory was successfully deleted.
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return False
+        try:
+            command = f"{adb_cmd} shell rm -rf {remote_path}"
+            run_command(command, shell=True)
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error occurred while deleting the path {remote_path} on device {device}: {e}", e
+            )
+            return False
+    
+    def create_directory(self, remote_path: str, accessMode: str, device="") -> bool:
+        """
+        Create a directory on the device.
+        Args:
+            device (str): The ID of the device.
+            remote_path (str): The remote path of the directory to create.
+            accessMode (str): The access mode of the directory, e.g. "755".
+        Returns:
+            bool: Whether the directory was successfully created.
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return False
+        try:
+            # Create the directory
+            command = f"{adb_cmd} shell mkdir -p {remote_path}"
+            run_command(command, shell=True)
+            # Set the access mode
+            command = f"{adb_cmd} shell chmod {accessMode} {remote_path}"
+            run_command(command, shell=True)
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error occurred while creating directory {remote_path} on device {device}: {e}", e
+            )
+            return False
+        
+    def change_access_mode(self, remote_path: str, accessMode: str, device="") -> bool:
+        """
+        Change the access mode of a file or directory on the device.
+        Args:
+            device (str): The ID of the device.
+            remote_path (str): The remote path of the file or directory.
+            accessMode (str): The access mode to set, e.g. "755".
+        Returns:
+            bool: Whether the access mode was successfully changed.
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return False
+        try:
+            command = f"{adb_cmd} shell chmod {accessMode} {remote_path}"
+            run_command(command, shell=True)
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error occurred while changing access mode of {remote_path} on device {device}: {e}", e
+            )
+            return False
+    
+        
 class PermissionInfo:
+
     def __init__(self, name="", sourcePackage="", prot=""):
         self.name = name
         self.sourcePackage = sourcePackage
@@ -1238,12 +1329,13 @@ class PermissionInfo:
         
 
 class PackagePermissionInfo:
+
     def __init__(self, packageName=""):
         self.packageName = packageName
         self.requestedPermissions = []  # List of permission names
-        self.grantedPermissions = []    # List of permission names
-        self.deniedPermissions = []     # List of permission names
-        self.definedPermissions = []    # List of PermissionInfo objects
+        self.grantedPermissions = []  # List of permission names
+        self.deniedPermissions = []  # List of permission names
+        self.definedPermissions = []  # List of PermissionInfo objects
     
     def __repr__(self):
         return f"PackagePermissionInfo(packageName={self.packageName}, requestedPermissions={self.requestedPermissions}, grantedPermissions={self.grantedPermissions}, deniedPermissions={self.deniedPermissions}, definedPermissions={self.definedPermissions})"

@@ -2,46 +2,47 @@
 
 import argparse
 import sys
+from script_base.log import simple_logger as logger
 
 class ScriptManager:
-    def __init__(self, description="一个多功能的脚本管理工具。"):
+    def __init__(self, description="A multifunctional script management tool."):
         self.parser = argparse.ArgumentParser(
             description=description,
-            formatter_class=argparse.RawTextHelpFormatter # 关键：使用 RawTextHelpFormatter 以保留文档字符串中的换行和格式
+            formatter_class=argparse.RawTextHelpFormatter # Key: use RawTextHelpFormatter to preserve newlines and formatting in docstrings
         )
         self.subparsers = self.parser.add_subparsers(
             dest="command",
-            help="可用命令"
+            help="Available commands"
         )
-        self.commands = {} # 存储命令实例
+        self.commands = {} # Store command instances
 
     def register_command(self, command_name: str, command_instance: 'Command', help_text: str = None):
         """
-        注册一个新命令。
+        Register a new command.
 
         Args:
-            command_name (str): 用户在命令行中输入的命令名称。
-            command_instance (Command): 命令的实例，必须继承自 Command 抽象基类。
-            help_text (str, optional): 命令的简要帮助信息。如果未提供，将使用命令类的 __doc__ 的第一行。
+            command_name (str): The command name entered by the user on the command line.
+            command_instance (Command): The command instance, must inherit from the Command abstract base class.
+            help_text (str, optional): Brief help text for the command. If not provided, the first line of the command class's __doc__ will be used.
         """
         if not isinstance(command_instance, Command):
-            raise TypeError("命令实例必须继承自 'Command' 抽象基类。")
+            raise TypeError("Command instance must inherit from the 'Command' abstract base class.")
 
-        # 使用命令的 __doc__ 作为完整描述，截取第一行作为简短帮助
+        # Use the command's __doc__ as the full description, take the first line as short help
         full_doc = command_instance.__doc__ if command_instance.__doc__ else ""
         short_help = help_text if help_text else full_doc.strip().split('\n')[0]
 
         parser_command = self.subparsers.add_parser(
             command_name,
-            help=short_help, # 用于命令行概览的简短帮助
-            description=full_doc # 用于特定命令帮助的完整描述
+            help=short_help, # Short help for command line overview
+            description=full_doc # Full description for specific command help
         )
         command_instance.add_arguments(parser_command)
         self.commands[command_name] = command_instance
 
     def run(self):
         """
-        解析命令行参数并执行相应的命令。
+        Parse command-line arguments and execute the corresponding command.
         """
         args = self.parser.parse_args()
 
@@ -50,50 +51,50 @@ class ScriptManager:
             try:
                 command_instance.execute(args)
             except Exception as e:
-                print(f"执行命令 '{args.command}' 时发生错误: {e}", file=sys.stderr)
+                logger.error(f"Error occurred while executing command '{args.command}", e)
                 sys.exit(1)
         else:
-            if args.command: # 如果用户输入了未知命令
-                print(f"未知命令: '{args.command}'\n", file=sys.stderr)
-            # 默认情况下，ArgumentParser.print_help() 会输出所有子命令的简要信息
-            # 如果需要更详细的汇总，可以手动遍历并打印
-            print("可用命令及其详细描述：")
+            if args.command: # If the user entered an unknown command
+                logger.error(f"Unknown command: '{args.command}'\n")
+            # By default, ArgumentParser.print_help() outputs a brief overview of all subcommands
+            # For more detailed summaries, you can manually iterate and print
+            logger.info("Available commands and their detailed descriptions:")
             for name, cmd_instance in self.commands.items():
-                print(f"\n  {name}:")
-                # 打印命令的完整文档字符串
+                logger.info(f"\n  {name}:")
+                # Print the full docstring of the command
                 doc = cmd_instance.__doc__
                 if doc:
-                    # 为了排版，可以对文档字符串进行缩进处理
+                    # For formatting, you can indent the docstring
                     indented_doc = "\n".join(["    " + line for line in doc.strip().split('\n')])
-                    print(indented_doc)
+                    logger.info(indented_doc)
                 else:
-                    print("    (无详细描述)")
-            print("\n有关特定命令的更多信息，请使用: ./your_script.py <command> --help")
+                    logger.info("    (No detailed description)")
+            logger.info("\nFor more information on a specific command, use: ./your_script.py <command> --help")
             sys.exit(1)
             
 from abc import ABC, abstractmethod
 
 class Command(ABC):
     """
-    所有命令的抽象基类。
-    每个具体的命令都必须继承此基类。
+    Abstract base class for all commands.
+    Each specific command must inherit from this base class.
     """
     @abstractmethod
     def add_arguments(self, parser: argparse.ArgumentParser):
         """
-        向命令的子解析器添加命令行参数。
+        Add command-line arguments to the command's subparser.
 
         Args:
-            parser (argparse.ArgumentParser): 该命令的子解析器，用于定义命令特有的参数。
+            parser (argparse.ArgumentParser): The subparser for the command, used to define command-specific arguments.
         """
         pass
 
     @abstractmethod
     def execute(self, args: argparse.Namespace):
         """
-        执行命令的具体逻辑。
+        Execute the specific logic of the command.
 
         Args:
-            args (argparse.Namespace): 解析后的命令行参数对象，包含所有命令行输入。
+            args (argparse.Namespace): The parsed command-line arguments object, containing all user inputs.
         """
         pass

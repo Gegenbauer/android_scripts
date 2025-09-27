@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-综合 adb 工具脚本，整合 set_time、show_focused_activity、android_file_viewer 功能。
+Comprehensive adb utility script, integrating set_time, show_focused_activity, and android_file_viewer features.
 """
 import os
 from script_base import log
@@ -17,11 +17,14 @@ from script_base.utils import (
     timestamp,
 )
 from script_base.log import logger
+from script_base.frida_utils import FridaScriptExecutor
+from export_bitmaps import export_bitmaps
+from set_language import set_android_language
 
 
 # ===== ViewFolderCommand & ViewFileCommand =====
 class ViewFolderCommand(Command):
-    """从设备拉取指定目录到本地缓存目录，并在文件管理器中打开。"""
+    """Pull a specified directory from the device to a local cache directory and open it in the file manager."""
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -29,26 +32,26 @@ class ViewFolderCommand(Command):
             "-p",
             type=str,
             required=True,
-            help="Android 设备上的目录路径，例如 /sdcard/Download/",
+            help="Directory path on the Android device, e.g., /sdcard/Download/",
         )
         parser.add_argument(
             "--cache-root",
             type=str,
-            help="本地缓存根目录（默认取环境变量 cache_files_dir 或当前目录）",
+            help="Local cache root directory (defaults to environment variable cache_files_dir or current directory)",
         )
         parser.add_argument(
             "--tag",
             type=str,
-            help="可选。自定义目录标签名，便于区分多次拉取。默认为基于设备路径与时间戳自动生成",
+            help="Optional. Custom directory tag name for distinguishing multiple pulls. Defaults to auto-generation based on device path and timestamp.",
         )
         parser.add_argument(
-            "--no-open", action="store_true", help="仅拉取到本地，不打开文件管理器"
+            "--no-open", action="store_true", help="Only pull to local, do not open file manager"
         )
 
     def execute(self, args):
         device_path = args.device_path
         if not device_path:
-            logger.error("错误: 必须提供 --device-path。")
+            logger.error("Error: --device-path must be provided.")
             return
         cache_root = cache_root_arg_to_path(args.cache_root)
         ensure_directory_exists(cache_root)
@@ -58,36 +61,36 @@ class ViewFolderCommand(Command):
         android_util = android_util_manager.select()
         connected_devices = android_util.get_connected_devices()
         if not connected_devices:
-            logger.info("未找到连接的设备。")
+            logger.info("No connected devices found.")
             return
         is_remote_path_dir = android_util.is_remote_path_directory(
             remote_path=device_path
         )
         if not is_remote_path_dir:
-            logger.error(f"错误: 设备路径 {device_path} 不是一个目录。")
+            logger.error(f"Error: Device path {device_path} is not a directory.")
             return
-        logger.info(f"拉取目录: {device_path} -> {local_base_dir}")
+        logger.info(f"Pulling directory: {device_path} -> {local_base_dir}")
         try:
             run_command(
                 ["adb", "pull", device_path, local_base_dir], check_output=False
             )
         except PermissionError as e:
-            logger.error(f"adb pull 权限错误: {e}", e)
+            logger.error(f"adb pull permission error: {e}", e)
             return
         except Exception as e:
-            logger.error(f"adb pull 失败: {e}", e)
+            logger.error(f"adb pull failed: {e}", e)
             return
         basename = os.path.basename(device_path.rstrip("/")) or "root"
         open_dir = os.path.join(local_base_dir, basename)
         if not os.path.exists(open_dir):
             open_dir = local_base_dir
-        logger.info(f"本地目录: {open_dir}")
+        logger.info(f"Local directory: {open_dir}")
         if not args.no_open:
             open_in_file_manager(open_dir)
 
 
 class ViewFileCommand(Command):
-    """从设备拉取指定文件到本地缓存目录，支持输出到终端或在 VSCode 中打开。"""
+    """Pull a specified file from the device to a local cache directory, with support for outputting to the terminal or opening in VSCode."""
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -95,36 +98,36 @@ class ViewFileCommand(Command):
             "-p",
             type=str,
             required=True,
-            help="Android 设备上的文件路径，例如 /sdcard/xxx.txt",
+            help="File path on the Android device, e.g., /sdcard/xxx.txt",
         )
         parser.add_argument(
             "--cache-root",
             type=str,
-            help="本地缓存根目录（默认取环境变量 cache_files_dir 或当前目录）",
+            help="Local cache root directory (defaults to environment variable cache_files_dir or current directory)",
         )
         group = parser.add_mutually_exclusive_group()
         group.add_argument(
-            "--cat", action="store_true", help="拉取后直接在终端输出文件内容"
+            "--cat", action="store_true", help="Directly output file content to the terminal after pulling"
         )
         group.add_argument(
-            "--open-in-vscode", action="store_true", help="拉取后用 VSCode 打开文件"
+            "--open-in-vscode", action="store_true", help="Open the file in VSCode after pulling"
         )
         group.add_argument(
             "--open-in-manager",
             action="store_true",
-            help="拉取后在文件管理器中显示文件",
+            help="Show the file in the file manager after pulling",
         )
         parser.add_argument(
             "--encoding",
             type=str,
             default="utf-8",
-            help="当使用 --cat 输出时采用的文件编码，默认 utf-8",
+            help="File encoding to use with --cat, defaults to utf-8",
         )
 
     def execute(self, args):
         device_path = args.device_path
         if not device_path:
-            logger.error("错误: 必须提供 --device-path。")
+            logger.error("Error: --device-path must be provided.")
             return
         cache_root = cache_root_arg_to_path(args.cache_root)
         ensure_directory_exists(cache_root)
@@ -134,12 +137,12 @@ class ViewFileCommand(Command):
         android_util = android_util_manager.select()
         is_remote_path_file = android_util.is_remote_path_file(device_path)
         if not is_remote_path_file:
-            logger.error(f"错误: 设备路径 {device_path} 不是一个文件。")
+            logger.error(f"Error: Device path {device_path} is not a file.")
             return
-        logger.info(f"拉取文件: {device_path} -> {local_dir}")
+        logger.info(f"Pulling file: {device_path} -> {local_dir}")
         connected_devices = android_util.get_connected_devices()
         if not connected_devices:
-            logger.info("未找到连接的设备。")
+            logger.info("No connected devices found.")
             return
         try:
             run_command(["adb", "pull", device_path, local_dir], check_output=False)
@@ -147,7 +150,7 @@ class ViewFileCommand(Command):
             logger.info(f"{str(e)}")
             return
         except Exception as e:
-            logger.error(f"adb pull 失败: {e}", e)
+            logger.error(f"adb pull failed: {e}", e)
             return
         local_file = os.path.join(local_dir, os.path.basename(device_path))
         if not os.path.exists(local_file):
@@ -156,28 +159,28 @@ class ViewFileCommand(Command):
             )
             local_file = candidate if os.path.exists(candidate) else local_file
         if not os.path.exists(local_file):
-            logger.error(f"未找到本地文件: {local_file}")
+            logger.error(f"Local file not found: {local_file}")
             return
-        logger.info(f"本地文件: {local_file}")
+        logger.info(f"Local file: {local_file}")
         # if xml_content:
         #     with open(local_file, "w", encoding="utf-8") as f:
         #         f.write(xml_content)
         # xml_content = ""
         # is_binary = android_util.is_binary_xml(local_file)
         # if is_binary:
-        #     logger.info("检测到二进制 XML 文件，尝试解析...")
+        #     logger.info("Binary XML file detected, attempting to parse...")
         #     xml_content = android_util.parse_binary_xml(local_file)
         # else:
         #     is_aapt_binary_xml = android_util.is_aapt_binary_xml(local_file)
         #     if is_aapt_binary_xml:
-        #         logger.info("检测到 AAPT 二进制 XML 文件，尝试解析...")
+        #         logger.info("AAPT binary XML file detected, attempting to parse...")
         #         xml_content = android_util.parse_aapt_binary_xml(local_file)
-        #         # 将解析后的 xml 写入回本地文件
+        #         # Write the parsed xml back to the local file
         #     is_aapt2_binary_xml = android_util.is_aapt2_binary_xml(local_file)
         #     if is_aapt2_binary_xml:
-        #         logger.info("检测到 AAPT2 二进制 XML 文件，尝试解析...")
+        #         logger.info("AAPT2 binary XML file detected, attempting to parse...")
         #         xml_content = android_util.parse_aapt2_binary_xml(local_file)
-        #         # 将解析后的 xml 写入回本地文件
+        #         # Write the parsed xml back to the local file
         if args.cat:
             try:
                 with open(
@@ -185,55 +188,53 @@ class ViewFileCommand(Command):
                 ) as f:
                     print(f.read())
             except Exception as e:
-                logger.error(f"读取文件失败: {e}", e)
+                logger.error(f"Failed to read file: {e}", e)
         elif args.open_in_vscode:
             open_in_vscode(local_file)
         elif args.open_in_manager:
             open_in_file_manager(local_file)
         else:
             logger.info(
-                "使用 --cat 输出内容，或使用 --open-in-vscode 打开文件，或 --open-in-manager 在文件管理器中显示文件。"
+                "Use --cat to output content, --open-in-vscode to open the file, or --open-in-manager to show it in the file manager."
             )
 
 
 class SetTimeCommand(Command):
     """
-    设置 Android 设备时间
+    Set the time on an Android device.
     """
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "time", help="目标时间(YYYY-MM-DD-HH-MM-SS)或'auto'自动同步网络时间"
+            "time", help="Target time (YYYY-MM-DD-HH-MM-SS) or 'auto' to sync with network time"
         )
 
     def execute(self, args):
         if args.time == "auto":
-            # 自动同步网络时间
+            # Automatically sync network time
             run_command("adb shell settings put global auto_time 1", shell=True)
             run_command(
                 "adb shell settings put global auto_time_zone 1", shell=True
             )  # Also enable auto timezone
-            log("自动时间和时区已启用")
+            logger.debug("Auto time and timezone enabled")
             return
         android_util = android_util_manager.select()
-        # 校验时间格式
+        # Validate time format
         if not android_util.is_valid_time_format(args.time):
-            logger.error(
-                "时间格式错误，应为 YYYY-MM-DD-HH-MM-SS 或 'auto'", level="error"
-            )
+            logger.error("Invalid time format, should be YYYY-MM-DD-HH-MM-SS or 'auto'")
             return
 
         connected_devices = android_util.get_connected_devices()
         if not connected_devices:
-            logger.info("未找到连接的设备。")
+            logger.info("No connected devices found.")
             return
 
         android_util = android_util_manager.select()
-        # 从设备获取 IANA 时区名称
+        # Get IANA timezone name from the device
         device_tz_name = android_util.get_device_timezone_name()
         if not device_tz_name:
             return
-        # 让设备自己计算 UTC 时间戳
+        # Let the device calculate the UTC timestamp itself
         milliseconds_utc = android_util.get_utc_milliseconds_from_device(args.time, device_tz_name)
         if milliseconds_utc is None:
             return
@@ -252,7 +253,7 @@ class SetTimeCommand(Command):
 
 class ShowFocusedActivityCommand(Command):
     """
-    显示当前聚焦的 Activity
+    Show the currently focused Activity.
     """
 
     def add_arguments(self, parser):
@@ -262,57 +263,59 @@ class ShowFocusedActivityCommand(Command):
         android_util = android_util_manager.select()
         connnected_devices = android_util.get_connected_devices()
         if not connnected_devices:
-            logger.error("未检测到连接的设备")
+            logger.error("No connected devices detected")
             return
         focused_package = android_util.get_focused_app_package()
         focused_activity = android_util.get_focused_activity()
         focused_window = android_util.get_focused_window()
-        logger.info(f"当前聚焦的包名: {focused_package}")
-        logger.info(f"当前聚焦的 Activity: {focused_activity}")
-        logger.info(f"当前聚焦的 Window: {focused_window}")
+        resumed_fragment = android_util.get_resumed_fragment()
+        logger.info(f"Currently focused package: {focused_package}")
+        logger.info(f"Currently focused Activity: {focused_activity}")
+        logger.info(f"Currently focused Window: {focused_window}")
+        logger.info(f"Current Resumed Fragment: {resumed_fragment}")
 
 
 class DumpMemoryCommand(Command):
     """
-    导出 Android 设备内存快照，并拉取到本地。可选转换为 MAT 支持的格式，并在 Finder 中展示。
+    Dump the memory snapshot of an Android device and pull it to the local machine. Optionally convert to a MAT-supported format and show in Finder.
     """
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "-p", "--package", help="目标应用包名。如果未提供，则必须使用 --focused。"
+            "-p", "--package", help="Target application package name. If not provided, --focused must be used."
         )
         parser.add_argument(
             "--focused",
             action="store_true",
-            help="使用当前聚焦的应用包名作为目标。",
+            help="Use the currently focused application's package name as the target.",
         )
         parser.add_argument(
             "--convert-mat",
             action="store_true",
-            help="是否转换为 MAT 支持的 hprof 格式",
+            help="Whether to convert to MAT-supported hprof format",
         )
         parser.add_argument(
             "--cache-dir",
             default=os.environ.get("cache_files_dir", "."),
-            help="本地缓存目录",
+            help="Local cache directory",
         )
 
     def execute(self, args):
         package_name = args.package
         if args.focused:
-            logger.info("正在获取当前聚焦的应用包名...")
+            logger.info("Getting the package name of the currently focused app...")
             android_util = android_util_manager.select()
             focused_package = android_util.get_focused_app_package()
             if focused_package:
                 package_name = focused_package
-                logger.info(f"成功获取到聚焦应用包名: {package_name}")
+                logger.info(f"Successfully got focused app package name: {package_name}")
             else:
-                logger.error("无法获取当前聚焦的应用包名，请确保目标应用在前台。")
+                logger.error("Could not get the currently focused app package name. Please ensure the target app is in the foreground.")
                 return
 
         if not package_name:
             logger.error(
-                "错误: 必须通过 -p/--package 提供包名，或使用 --focused 标志。"
+                "Error: You must provide a package name with -p/--package, or use the --focused flag."
             )
             return
 
@@ -321,18 +324,18 @@ class DumpMemoryCommand(Command):
         ensure_directory_exists(local_dir)
         remote_hprof = f"/data/local/tmp/{package_name}_{ts}.hprof"
         local_hprof = os.path.join(local_dir, f"{package_name}_{ts}.hprof")
-        # 导出内存
-        logger.info(f"导出内存快照: {remote_hprof}")
+        # Dump memory
+        logger.info(f"Dumping memory snapshot: {remote_hprof}")
         run_command(["adb", "shell", "am", "dumpheap", package_name, remote_hprof])
-        # 拉取到本地
-        logger.info(f"拉取到本地: {local_hprof}")
+        # Pull to local
+        logger.info(f"Pulling to local: {local_hprof}")
         run_command(["adb", "pull", remote_hprof, local_hprof])
-        # 可选转换
+        # Optional conversion
         if args.convert_mat:
             mat_hprof = os.path.join(local_dir, f"{package_name}_{ts}_mat.hprof")
-            logger.info(f"转换为 MAT 格式: {mat_hprof}")
-            run_command(["adb", "shell", "rm", remote_hprof])  # 清理设备端
-            # Android 导出的 hprof 需用 hprof-conv 转换
+            logger.info(f"Converting to MAT format: {mat_hprof}")
+            run_command(["adb", "shell", "rm", remote_hprof])  # Clean up on device
+            # Hprof exported from Android needs to be converted with hprof-conv
             platform_tools_path = android_util.get_android_platform_tools_path()
             hprof_conv = (
                 os.path.join(platform_tools_path, "hprof-conv")
@@ -340,11 +343,11 @@ class DumpMemoryCommand(Command):
                 else "hprof-conv"
             )
             if not os.path.exists(hprof_conv):
-                logger.warning("未找到 hprof-conv 工具，跳过转换")
+                logger.warning("hprof-conv tool not found, skipping conversion")
             else:
                 run_command([hprof_conv, local_hprof, mat_hprof])
                 local_hprof = mat_hprof
-        # 打开 Finder
+        # Open Finder
         import platform
 
         if platform.system().lower() == "darwin":
@@ -353,130 +356,130 @@ class DumpMemoryCommand(Command):
             run_command(["explorer", "/select,", local_hprof], check_output=False)
         else:
             run_command(["xdg-open", local_dir], check_output=False)
-        logger.info(f"内存快照已保存到: {local_hprof}")
+        logger.info(f"Memory snapshot saved to: {local_hprof}")
 
 
 class SetUiModeCommand(Command):
     """
-    切换 Android 设备的白天/黑夜模式。
+    Switch the day/night mode of the Android device.
     """
 
     def add_arguments(self, parser):
         parser.add_argument(
             "mode",
             choices=["day", "night", "auto"],
-            help="要设置的 UI 模式: 'day' (白天), 'night' (黑夜), 或 'auto' (自动)。",
+            help="The UI mode to set: 'day', 'night', or 'auto'.",
         )
 
     def execute(self, args):
-        # 检查设备连接
+        # Check device connection
         android_util = android_util_manager.select()
         if not android_util.get_connected_devices():
-            logger.error("未检测到连接的设备")
+            logger.error("No connected devices detected")
             return
 
-        # 映射用户输入到 adb 命令参数
+        # Map user input to adb command arguments
         mode_map = {"day": "no", "night": "yes", "auto": "auto"}
         adb_mode_arg = mode_map[args.mode]
 
         try:
             logger.info(
-                f"正在将 UI 模式设置为: {args.mode} (adb: 'cmd uimode night {adb_mode_arg}')"
+                f"Setting UI mode to: {args.mode} (adb: 'cmd uimode night {adb_mode_arg}')"
             )
             run_command(["adb", "shell", "cmd", "uimode", "night", adb_mode_arg])
-            logger.info("UI 模式设置成功。")
+            logger.info("UI mode set successfully.")
         except Exception as e:
-            logger.error(f"设置 UI 模式时失败", exc=e)
+            logger.error(f"Failed to set UI mode", exc=e)
 
 
 class KillCommand(Command):
     """
-    强制停止一个 Android 应用。
+    Force stop an Android application.
     """
 
     def add_arguments(self, parser):
         group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument("-p", "--package", help="要强制停止的目标应用包名。")
+        group.add_argument("-p", "--package", help="The package name of the target application to force stop.")
         group.add_argument(
             "--focused",
             action="store_true",
-            help="强制停止当前聚焦的应用。",
+            help="Force stop the currently focused application.",
         )
 
     def execute(self, args):
         package_name = args.package
         if args.focused:
-            logger.info("正在获取当前聚焦的应用包名...")
+            logger.info("Getting the package name of the currently focused app...")
             android_util = android_util_manager.select()
             focused_package = android_util.get_focused_app_package()
             if focused_package:
                 package_name = focused_package
-                logger.info(f"成功获取到聚焦应用包名: {package_name}")
+                logger.info(f"Successfully got focused app package name: {package_name}")
             else:
-                logger.error("无法获取当前聚焦的应用包名，请确保目标应用在前台。")
+                logger.error("Could not get the currently focused app package name. Please ensure the target app is in the foreground.")
                 return
 
         try:
-            logger.info(f"正在强制停止应用: {package_name}")
+            logger.info(f"Force stopping application: {package_name}")
             android_util.kill_process(package_name)
-            logger.info(f"应用 {package_name} 已被强制停止。")
+            logger.info(f"Application {package_name} has been force stopped.")
         except Exception as e:
-            logger.error(f"强制停止应用 {package_name} 失败", exc=e)
+            logger.error(f"Failed to force stop application {package_name}", exc=e)
 
 
 class ClearDataCommand(Command):
     """
-    清除应用的部分或全部数据，提供比 'pm clear' 更精细的控制。
-    需要 root 权限来操作内部存储。
+    Clear some or all of an application's data, providing more fine-grained control than 'pm clear'.
+    Requires root permission to operate on internal storage.
     """
 
     def add_arguments(self, parser):
         group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument("-p", "--package", help="目标应用包名。")
+        group.add_argument("-p", "--package", help="Target application package name.")
         group.add_argument(
-            "--focused", action="store_true", help="使用当前聚焦的应用包名。"
+            "--focused", action="store_true", help="Use the currently focused application's package name."
         )
 
         parser.add_argument(
             "--type",
-            nargs="+",  # 允许多个值
+            nargs="+",  # Allow multiple values
             required=True,
             choices=["database", "shared_prefs", "files", "cache", "mmkv", "all"],
-            help="要清除的数据类型（可多选）。'all' 会清除所有类型。",
+            help="Data types to clear (multiple choices allowed). 'all' clears all types.",
         )
         parser.add_argument(
             "--location",
             choices=["internal", "external"],
             default="internal",
-            help="数据存储位置：'internal' (默认) 或 'external'。",
+            help="Data storage location: 'internal' (default) or 'external'.",
         )
 
     def execute(self, args):
         package_name = args.package
         if args.focused:
-            logger.info("正在获取当前聚焦的应用包名...")
+            logger.info("Getting the package name of the currently focused app...")
             android_util = android_util_manager.select()
             focused_package = android_util.get_focused_app_package()
             if focused_package:
                 package_name = focused_package
-                logger.info(f"成功获取到聚焦应用包名: {package_name}")
+                logger.info(f"Successfully got focused app package name: {package_name}")
             else:
-                logger.error("无法获取当前聚焦的应用包名，请确保目标应用在前台。")
+                logger.error("Could not get the currently focused app package name. Please ensure the target app is in the foreground.")
                 return
 
-        # 检查 root 权限
+        # Check for root permission
         if args.location == "internal" and not android_util.is_adb_running_as_root():
-            logger.error("错误: 清除内部存储数据需要 root 权限。请先执行 'adb root'。")
+            logger.error("Error: Clearing internal storage data requires root permission. Please run 'adb root' first.")
             return
 
-        # 定义路径映射
+        # Define path mappings
         path_map = {
             "internal": {
                 "database": f"/data/data/{package_name}/databases",
                 "shared_prefs": f"/data/data/{package_name}/shared_prefs",
                 "files": f"/data/data/{package_name}/files",
                 "cache": f"/data/data/{package_name}/cache",
-                "mmkv": f"/data/data/{package_name}/files/mmkv",  # MMKV 默认路径
+                "mmkv": f"/data/data/{package_name}/files/mmkv",  # Default MMKV path
             },
             "external": {
                 "files": f"/sdcard/Android/data/{package_name}/files",
@@ -489,70 +492,194 @@ class ClearDataCommand(Command):
             types_to_clear = set(path_map[args.location].keys())
 
         logger.info(
-            f"准备在 '{args.location}' 位置为应用 '{package_name}' 清除以下类型的数据: {', '.join(types_to_clear)}"
+            f"Preparing to clear the following data types for app '{package_name}' at '{args.location}' location: {', '.join(types_to_clear)}"
         )
 
         for data_type in types_to_clear:
             location_map = path_map.get(args.location)
             if not location_map or data_type not in location_map:
                 logger.warning(
-                    f"警告: 在 '{args.location}' 位置不支持清除 '{data_type}' 类型的数据，已跳过。"
+                    f"Warning: Clearing data type '{data_type}' is not supported at '{args.location}' location. Skipped."
                 )
                 continue
 
             target_path = location_map[data_type]
             try:
-                logger.info(f"正在清除: {target_path}")
-                # 使用 rm -rf 清除目录内容
+                logger.info(f"Clearing: {target_path}")
+                # Use rm -rf to clear directory contents
                 run_command(["adb", "shell", "rm", "-rf", f"{target_path}/*"])
-                logger.info(f"成功清除 {target_path} 的内容。")
+                logger.info(f"Successfully cleared contents of {target_path}.")
             except Exception as e:
-                logger.error(f"清除 {target_path} 时失败", exc=e)
+                logger.error(f"Failed while clearing {target_path}", exc=e)
+
+
+class ExportBitmapsCommand(Command):
+    """
+    Export all in-memory Bitmaps from a running Android app process using Frida and pull them to the local machine.
+    """
+    def add_arguments(self, parser):
+        parser.add_argument("--package", type=str, required=True, help="Android package name to export bitmaps from.")
+        parser.add_argument("--output-dir", type=str, help="Local output directory. Defaults to cache_files_dir/exported_bitmaps/<package>_<timestamp>/")
+        parser.add_argument("--frida-script", type=str, default="export_bitmaps.js", help="Frida JS script filename (default: export_bitmaps.js)")
+        parser.add_argument("--device-id", type=str, help="The ID of the specific device to connect to.")
+
+    def execute(self, args):
+        output_dir = export_bitmaps(
+            package=args.package,
+            output_dir=args.output_dir,
+            frida_script=args.frida_script,
+            device_id=args.device_id
+        )
+        # show in file manager
+        import script_base.utils as utils
+        if output_dir and os.path.exists(output_dir):
+            first_file_in_dir = None
+            for root, dirs, files in os.walk(output_dir):
+                if files:
+                    first_file_in_dir = os.path.join(root, files[0])
+                    break
+            if first_file_in_dir and os.path.exists(first_file_in_dir):
+                utils.open_in_file_manager(first_file_in_dir)
+            else:
+                utils.open_in_file_manager(output_dir)
+        else:
+            logger.error("No bitmaps were exported.")
+        
+
+class SetLanguageCommand(Command):
+    """
+    Set the system language on an Android device using Frida.
+    """
+    def add_arguments(self, parser):
+        parser.add_argument("--language", type=str, required=True, help="Language code, e.g. 'en', 'zh'")
+        parser.add_argument("--country", type=str, default="", help="Country/region code, e.g. 'US', 'CN'")
+        parser.add_argument("--package", type=str, default="com.android.settings", help="Target process package name (default: com.android.settings)")
+        parser.add_argument("--device-id", type=str, help="The ID of the specific device to connect to.")
+
+    def execute(self, args):
+        set_android_language(
+            language=args.language,
+            country=args.country,
+            package_name=args.package,
+            device_id=args.device_id
+        )
+        
+        
+class DebuggerCommand(Command):
+    """
+    Set or clear the application to be debugged.
+    """
+
+    def add_arguments(self, parser):
+        subparsers = parser.add_subparsers(dest="action", required=True, help="Action to perform")
+
+        # Sub-parser for 'set'
+        parser_set = subparsers.add_parser("set", help="Set the debugger application.")
+        group = parser_set.add_mutually_exclusive_group(required=True)
+        group.add_argument("-p", "--package", help="The package name of the target application to set as debugger.")
+        group.add_argument(
+            "--focused",
+            action="store_true",
+            help="Set the currently focused application as the debugger.",
+        )
+
+        # Sub-parser for 'clear'
+        subparsers.add_parser("clear", help="Clear the current debugger application.")
+
+    def execute(self, args):
+        android_util = android_util_manager.select()
+        if not android_util.get_connected_devices():
+            logger.error("No connected devices detected")
+            return
+
+        if args.action == "set":
+            package_name = args.package
+            if args.focused:
+                logger.info("Getting the package name of the currently focused app...")
+                focused_package = android_util.get_focused_app_package()
+                if focused_package:
+                    package_name = focused_package
+                    logger.info(f"Successfully got focused app package name: {package_name}")
+                else:
+                    logger.error("Could not get the currently focused app package name. Please ensure the target app is in the foreground.")
+                    return
+            
+            if not package_name:
+                logger.error("Package name is required to set the debugger app.")
+                return
+
+            logger.info(f"Setting {package_name} as the debugger app...")
+            if android_util.set_debugger_app(package_name):
+                logger.info(f"Successfully set {package_name} as the debugger app.")
+            else:
+                logger.error(f"Failed to set {package_name} as the debugger app.")
+
+        elif args.action == "clear":
+            logger.info("Clearing the debugger app...")
+            if android_util.remove_debugger_app():
+                logger.info("Successfully cleared the debugger app.")
+            else:
+                logger.error("Failed to clear the debugger app.")
 
 
 if __name__ == "__main__":
-    # 测试 环境变量中 android_sdk_path 是否存在
+    # Test if android_sdk_path exists in environment variables
     manager = ScriptManager(
-        description="Android ADB 多功能工具脚本。\n\n包含 set-time, show-focused-activity, file-viewer 等子命令，支持时间设置、聚焦 Activity 查询、文件/文件夹拉取与查看等功能。\n\n用法示例：\n  python adb.py set-time 2025-08-23-12-00-00\n  python adb.py show-focused-activity\n  python adb.py file-viewer view-folder /sdcard/Download\n  python adb.py file-viewer view-file /sdcard/Download/test.txt --open-in-vscode\n  python adb.py set-ui-mode night\n  python adb.py dump-memory --focused\n"
+        description="Android ADB multi-tool script.\n\nIncludes subcommands like set-time, show-focused-activity, file-viewer, etc., supporting time setting, focused activity query, file/folder pulling and viewing.\n\nUsage examples:\n  python adb.py set-time 2025-08-23-12-00-00\n  python adb.py show-focused-activity\n  python adb.py view-folder /sdcard/Download\n  python adb.py view-file /sdcard/Download/test.txt --open-in-vscode\n  python adb.py set-ui-mode night\n  python adb.py dump-memory --focused\n"
     )
 
     manager.register_command(
-        "set-time", SetTimeCommand(), help_text="设置 Android 设备时间。"
+        "set-time", SetTimeCommand(), help_text="Set the time on an Android device."
     )
     manager.register_command(
         "show-focused-activity",
         ShowFocusedActivityCommand(),
-        help_text="显示当前聚焦的 Activity。",
+        help_text="Show the currently focused Activity.",
     )
     manager.register_command(
         "view-folder",
         ViewFolderCommand(),
-        help_text="查看设备目录：拉取到本地并打开文件管理器。",
+        help_text="View a device directory: pull to local and open in file manager.",
     )
     manager.register_command(
         "view-file",
         ViewFileCommand(),
-        help_text="查看设备文件：拉取到本地，可输出或在 VSCode 打开。",
+        help_text="View a device file: pull to local, can output or open in VSCode.",
     )
     manager.register_command(
         "dump-memory",
         DumpMemoryCommand(),
-        help_text="导出内存快照并拉取到本地，可选转换为 MAT 格式并在 Finder 展示。",
+        help_text="Dump memory snapshot and pull to local, optionally convert to MAT format and show in Finder.",
     )
     manager.register_command(
         "set-ui-mode",
         SetUiModeCommand(),
-        help_text="切换 Android 设备的白天/黑夜模式。",
+        help_text="Switch the day/night mode of the Android device.",
     )
     manager.register_command(
         "kill",
         KillCommand(),
-        help_text="强制停止一个 Android 应用（通过包名或聚焦的应用）。",
+        help_text="Force stop an Android application (by package name or focused app).",
     )
     manager.register_command(
         "clear-data",
         ClearDataCommand(),
-        help_text="精细化清除应用数据（需要 root 权限）。"
+        help_text="Fine-grained clearing of application data (requires root permission)."
+    )
+    manager.register_command(
+        "export-bitmaps",
+        ExportBitmapsCommand(),
+        help_text="Export all in-memory Bitmaps from a running Android app process using Frida."
+    )
+    manager.register_command(
+        "set-language",
+        SetLanguageCommand(),
+        help_text="Set the system language on an Android device using Frida."
+    )
+    manager.register_command(
+        "debugger",
+        DebuggerCommand(),
+        help_text="Set or clear the application to be debugged."
     )
 
     manager.run()

@@ -1,0 +1,15 @@
+{
+  "name": "python_scripts",
+  "version": "1.0.0",
+  "main": "export_bitmaps.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "frida-java-bridge": "^7.0.8"
+  }
+}

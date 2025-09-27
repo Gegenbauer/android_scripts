@@ -1,59 +1,76 @@
-# 指导 GitHub Copilot 的提示词（为本仓库量身定制）
+# GitHub Copilot Prompt (Custom for this Repository)
 
-目标：当我在 `python_scripts/` 下编写新脚本时，请严格遵循以下约定，统一复用 `script_base` 的基类与工具函数，整体风格参考 `git.py`。
+Goal: When writing new scripts under `python_scripts/`, strictly follow the conventions below, always reusing the `script_base` base classes and utility functions. Overall style should reference `git.py`.
 
 ---
 
-你是 GitHub Copilot。请按照下述要求生成脚本：
+You are GitHub Copilot. Please generate scripts according to the following requirements:
 
-- 脚本定位
-  - 所有新脚本均放在 `python_scripts/` 目录下。
-  - 入口均为 `if __name__ == "__main__":`，使用 `ScriptManager` 注册并运行命令。
+- Script Location
+  - All new scripts must be placed in the `python_scripts/` directory.
+  - The entry point must be `if __name__ == "__main__":`, using `ScriptManager` to register and run commands.
 
-- 基类与工具（必须复用）
-  - 从 `script_base` 导入：
+- Base Classes & Utilities (Must Reuse)
+  - Import from `script_base`:
     - `from script_base.script_manager import ScriptManager, Command`
-    - `from script_base.utils import run_command, ensure_directory_exists, log_message`
-  - 不自行实现命令分发、日志与目录创建，统一复用上面工具。
+    - `from script_base.utils import run_command, ensure_directory_exists`
+    - `from script_base.log import logger`
+  - Do not implement your own command dispatch, logging, or directory creation—always reuse the above utilities.
 
-- 命令风格
-  - 每个子命令派生自 `Command`，实现：
-    - `add_arguments(self, parser: argparse.ArgumentParser)` 定义 CLI 参数
-    - `execute(self, args: argparse.Namespace)` 实现业务逻辑
-  - 使用清晰的中文 docstring 说明命令的用途、参数与行为；`ScriptManager` 会用它作为帮助信息。
-  - 注册命令示例：
-    - `manager.register_command("your-command", YourCommand(), help_text="一句话简介")`
+- Command Style
+  - Each subcommand should inherit from `Command` and implement:
+    - `add_arguments(self, parser: argparse.ArgumentParser)` to define CLI arguments
+    - `execute(self, args: argparse.Namespace)` to implement business logic
+  - Use clear English docstrings to describe the command's purpose, parameters, and behavior; `ScriptManager` will use this as help info.
+  - Example command registration:
+    - `manager.register_command("your-command", YourCommand(), help_text="One-line summary")`
 
-- CLI 设计规范
-  - 长参数使用 `--kebab-case`，可添加短参数别名（如 `-p`）。
-  - 互斥选项使用 `parser.add_mutually_exclusive_group()`。
-  - 默认值明确，帮助文本完整，必要参数 `required=True`。
+- CLI Design Guidelines
+  - Use `--kebab-case` for long arguments, and optionally add short aliases (e.g., `-p`).
+  - Use `parser.add_mutually_exclusive_group()` for mutually exclusive options.
+  - Set explicit defaults, provide complete help text, and use `required=True` for required arguments.
 
-- 统一工具调用
-  - Shell/外部命令：优先使用 `run_command(["cmd", "arg"], check_output=...)`。
-    - 需要仅执行并忽略输出用 `check_output=False`。
-    - 出错时交由工具函数抛出并打印 stderr。
-  - 目录：使用 `ensure_directory_exists(path)` 保证存在。
-  - 日志：使用 `log_message("消息", level="INFO"|"ERROR"|...)`。
+- Unified Utility Usage
+  - Shell/external commands: Prefer `run_command(["cmd", "arg"], check_output=...)`.
+    - Use `check_output=False` if you only need to execute and ignore output.
+    - On error, let the utility function raise and print stderr.
+  - Directories: Use `ensure_directory_exists(path)` to ensure existence.
+  - Logging: Use `logger in script_base.log: logger.info("This is a log message.")`.
 
-- Android 设备相关操作（示例约定）
-  - ADB 拉取：`run_command(["adb", "pull", remote, local], check_output=False)`。
-  - 打开文件管理器：
-    - macOS: `open path`；Windows: `explorer path`；Linux: `xdg-open path`（用 `run_command` 调用）。
-  - 打开 VSCode：`run_command(["code", "-g", f"{file}:{line}"])`，行号可选。
+- Android Device Operations (Sample Conventions)
+  - ADB pull: `run_command(["adb", "pull", remote, local], check_output=False)`.
+  - Open file manager:
+    - macOS: `open path`; Windows: `explorer path`; Linux: `xdg-open path` (use `run_command`).
+  - Open VSCode: `run_command(["code", "-g", f"{file}:{line}"])`, line number optional.
 
-- 缓存/输出目录约定
-  - 本地缓存根目录默认优先读取环境变量 `cache_files_dir`，否则为当前目录 `.`。
-  - 建议统一组织为：`<cache_root>/<feature_name>/<sanitized_key>_<timestamp>/...`。
-  - `timestamp` 使用 `datetime.now().strftime("%Y%m%d_%H%M%S")`。
+- Cache/Output Directory Conventions
+  - The local cache root directory should first read the `cache_files_dir` environment variable, otherwise use the current directory `.`.
+  - Recommended organization: `<cache_root>/<feature_name>/<sanitized_key>_<timestamp>/...`.
+  - `timestamp` should use `datetime.now().strftime("%Y%m%d_%H%M%S")`.
 
-- 异常与健壮性
-  - 对关键外部命令加 try/except；报错打印到 `stderr` 并尽量给出下一步提示。
-  - 文件编码读取时优先 `encoding="utf-8"`，并设置 `errors="replace"`，避免因非法字符崩溃。
+- Exception Handling & Robustness
+  - Add try/except for key external commands; print errors to `stderr` and provide next-step hints when possible.
+  - When reading files, prefer `encoding="utf-8"` and set `errors="replace"` to avoid crashes from invalid characters.
 
-- 骨架模板（生成新脚本时参考）
-  - 顶部添加 shebang：`#!/usr/bin/env python3`。
-  - 典型结构：
+- Frida integration
+  - All Frida JS scripts **must export functions with lowercase names** in `rpc.exports` (e.g., `rpc.exports = { exportbitmaps: ... }`).
+  - When calling Frida RPC methods from Python, **always use lowercase method names** (e.g., `executor.call_rpc('exportbitmaps', ...)`).
+  - All Python code that interacts with Frida **must use the shared frida_utils.py module** (do not use frida directly in business scripts).
+  - For Python scripts whose sole purpose is to provide a callable function for Frida script invocation (not a CLI tool), you **do not need to implement command-line argument parsing or ScriptManager/Command**. Just provide a main function, utility functions, and (optionally) a test block under `if __name__ == "__main__":`.
+  - Example usage:
+    ```python
+    from script_base.frida_utils import FridaScriptExecutor
+    executor = FridaScriptExecutor('your_script.js', device_id=device.id)
+    executor.run_script(pid, [("exportbitmaps", (), True)])
+    ```
+  - Frida JS/Python interaction specification:
+    - Frida JS scripts and Python should communicate, log, report progress, and output errors uniformly using send({type, message}), where type can be info, error, finish, etc., and message is a string.
+    - Direct use of console.log is prohibited; all messages must be sent via send.
+    - For specific style, refer to set_language.js.
+
+- Skeleton Template (Reference for New Scripts)
+  - Add shebang at the top: `#!/usr/bin/env python3`.
+  - Typical structure:
 
 ```
 #!/usr/bin/env python3
@@ -62,46 +79,48 @@ import os
 import sys
 from datetime import datetime
 from script_base.script_manager import ScriptManager, Command
-from script_base.utils import run_command, ensure_directory_exists, log_message
+from script_base.utils import run_command, ensure_directory_exists
+from script_base.log import logger
 
 class YourCommand(Command):
-    """命令用途的一句话说明。
+    """One-line description of the command's purpose.
 
-    更详细的多行说明：
-    - 参数解释
-    - 行为说明
+    More detailed multi-line description:
+    - Parameter explanations
+    - Behavioral notes
     """
     def add_arguments(self, parser: argparse.ArgumentParser):
-        parser.add_argument("--path", "-p", type=str, required=True, help="示例参数")
+        parser.add_argument("--path", "-p", type=str, required=True, help="Example parameter")
         group = parser.add_mutually_exclusive_group()
-        group.add_argument("--flag-a", action="store_true", help="选项A")
-        group.add_argument("--flag-b", action="store_true", help="选项B")
+        group.add_argument("--flag-a", action="store_true", help="Option A")
+        group.add_argument("--flag-b", action="store_true", help="Option B")
 
     def execute(self, args: argparse.Namespace):
         ensure_directory_exists("/tmp")
-        log_message(f"处理路径: {args.path}")
+        logger.info(f"Processing path: {args.path}")
         try:
             run_command(["echo", args.path], check_output=False)
         except Exception as e:
-            print(f"命令执行失败: {e}", file=sys.stderr)
+            logger.error(f"Command execution failed: {e}", e)
             return
-        print("完成")
+        print("Done")
 
 if __name__ == "__main__":
-    manager = ScriptManager(description="脚本集合：统一基于 script_base 的命令工具。")
-    manager.register_command("your-command", YourCommand(), help_text="一句话简介")
+    manager = ScriptManager(description="Script collection: unified command-line tools based on script_base.")
+    manager.register_command("your-command", YourCommand(), help_text="One-line summary")
     manager.run()
 ```
 
-- 参考文件（务必先阅读，再按风格实现）
+- Reference Files (Read these first and follow their style)
   - `python_scripts/script_base/script_manager.py`
   - `python_scripts/script_base/utils.py`
   - `python_scripts/script_base/script_impl_sample.py`
-  - `python_scripts/git.py`（风格、结构、错误处理）
+  - `python_scripts/git.py` (for style, structure, error handling)
 
-- 提交前自检清单
-  - [ ] 使用了 ScriptManager/Command 体系
-  - [ ] 复用了 utils 的 `run_command/ensure_directory_exists/log_message`
-  - [ ] 参数命名、帮助文案、互斥组符合规范
-  - [ ] 关键外部命令已做异常处理
-  - [ ] 输出对用户友好（中文提示），且尽量简洁
+- Pre-commit Checklist
+  - [ ] Uses ScriptManager/Command system
+  - [ ] Reuses utils: `run_command/ensure_directory_exists/logger`
+  - [ ] Argument naming, help text, and mutually exclusive groups follow conventions
+  - [ ] Key external commands have exception handling
+  - [ ] Output is user-friendly (in English), and as concise as possible
+  - [ ] All code comments and log messages must be written in English.

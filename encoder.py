@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-多功能编码/解码工具，支持 utf-8、base64、url。
+Multi-purpose encoding/decoding tool, supporting utf-8, base64, and url.
 """
 import base64
 import urllib.parse
@@ -75,13 +75,13 @@ def read_file_content(file_path):
 
 class EncodeCommand(Command):
     """
-    对输入文本进行编码，支持 utf-8、base64、url。
+    Encodes input text, supporting utf-8, base64, and url.
     """
     def add_arguments(self, parser):
         group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument("--text", type=str, help="要编码的字符串。")
-        group.add_argument("--file", type=str, help="包含要编码内容的文件路径。")
-        parser.add_argument("--encoding", type=str, default="utf-8", help="编码方式，支持 utf-8, base64, url。默认 utf-8。")
+        group.add_argument("--text", type=str, help="The string to encode.")
+        group.add_argument("--file", type=str, help="Path to the file containing the content to encode.")
+        parser.add_argument("--encoding", type=str, default="utf-8", help="Encoding type, supports utf-8, base64, url. Default is utf-8.")
 
     def execute(self, args):
         try:
@@ -93,18 +93,18 @@ class EncodeCommand(Command):
             result = strategy.encode(text)
             print(result)
         except Exception as e:
-            logger.error(f"编码失败: {e}", exc=e)
+            logger.error(f"Encoding failed: {e}", exc_info=True)
             sys.exit(1)
 
 class DecodeCommand(Command):
     """
-    对输入文本进行解码，支持 utf-8、base64、url。
+    Decodes input text, supporting utf-8, base64, and url.
     """
     def add_arguments(self, parser):
         group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument("--text", type=str, help="要解码的字符串。")
-        group.add_argument("--file", type=str, help="包含要解码内容的文件路径。")
-        parser.add_argument("--encoding", type=str, default="utf-8", help="解码方式，支持 utf-8, base64, url。默认 utf-8。")
+        group.add_argument("--text", type=str, help="The string to decode.")
+        group.add_argument("--file", type=str, help="Path to the file containing the content to decode.")
+        parser.add_argument("--encoding", type=str, default="utf-8", help="Decoding type, supports utf-8, base64, url. Default is utf-8.")
 
     def execute(self, args):
         try:
@@ -116,11 +116,11 @@ class DecodeCommand(Command):
             result = strategy.decode(text)
             print(result)
         except Exception as e:
-            logger.error(f"解码失败: {e}", exc=e)
+            logger.error(f"Decoding failed: {e}", exc_info=True)
             sys.exit(1)
 
 if __name__ == "__main__":
-    manager = ScriptManager(description="多功能编码/解码工具，支持 utf-8、base64、url。\n\n用法示例：\n  python encoder.py encode --text 'abc' --encoding base64\n  python encoder.py decode --file ./data.txt --encoding url\n")
-    manager.register_command("encode", EncodeCommand(), help_text="对输入文本进行编码。")
-    manager.register_command("decode", DecodeCommand(), help_text="对输入文本进行解码。")
+    manager = ScriptManager(description="Multi-purpose encoding/decoding tool, supporting utf-8, base64, and url.\n\nUsage examples:\n  python encoder.py encode --text 'abc' --encoding base64\n  python encoder.py decode --file ./data.txt --encoding url\n")
+    manager.register_command("encode", EncodeCommand(), help_text="Encode the input text.")
+    manager.register_command("decode", DecodeCommand(), help_text="Decode the input text.")
     manager.run()

@@ -10,7 +10,7 @@ from script_base.log import logger
 
 class AndroidUtilManager:
     """
-    管理所有 AndroidUtil 实现，根据设备信息选择最合适的实现。
+    Manage all AndroidUtil implementations and select the most suitable one based on device information.
     """
 
     def __init__(self):
@@ -19,15 +19,15 @@ class AndroidUtilManager:
 
     def register(self, impl_class, android_version=None, brand=None):
         """
-        注册实现类，可指定适用的 android_version 和品牌名。
+        Register an implementation class, optionally specifying the applicable android_version and brand name.
         """
         self._impls.append((impl_class, android_version, brand))
-        logger.info(f"注册实现: {impl_class.__name__}, version={android_version}, brand={brand}")
+        logger.info(f"Registered implementation: {impl_class.__name__}, version={android_version}, brand={brand}")
 
     def select(self):
         """
-        根据 device_info 选择最合适的实现。
-        device_info: dict, 至少包含 'android_version', 'brand'
+        Select the most suitable implementation based on device_info.
+        device_info: dict, must contain 'android_version', 'brand'
         """
         default_impl = self._impls[0][0]()
         version = default_impl.get_device_sdk_version()
@@ -43,10 +43,10 @@ class AndroidUtilManager:
                 return impl()
         if self._impls:
             return self._impls[0][0]()
-        raise RuntimeError("未注册任何 AndroidUtil 实现")
+        raise RuntimeError("No AndroidUtil implementation registered")
 
 
-# 全局管理实例
+# Global manager instance
 android_util_manager = AndroidUtilManager()
 
 if __name__ == "__main__":
@@ -69,10 +69,11 @@ if __name__ == "__main__":
         logger.info(
             f"App Version for 'com.android.settings':{android_util.get_app_version('com.android.settings')}"
         )
-        logger.info(
-            "PID of 'com.android.settings':"
-            +str(android_util.get_pid_of_app("com.android.settings"))
-        )
+        pid = android_util.get_pid_of_app("com.android.settings")
+        if pid == -1:
+            logger.info("PID of 'com.android.settings' not found. Is the app running?")
+        else:
+            logger.info(f"PID of 'com.android.settings': {pid}")
         logger.info(
             "Clearing app data for 'com.android.settings':"
             +str(android_util.clear_app_data("com.android.settings"))
@@ -102,10 +103,10 @@ if __name__ == "__main__":
         )
         # logger.info("Killing process 'com.android.launcher3': " + str(kill_process(package_name='com.android.launcher3')))
         # logger.info("Uninstalling 'com.android.launcher3': " + str(uninstall_app(package_name='com.android.launcher3')))
-        logger.info("All Permissions: " + str(android_util.get_all_permissions()))
-        permissions = android_util.get_all_permissions()
-        permissions_args = " ".join([perm.name for perm in permissions])
-        print(permissions_args)
-        logger.info("All Package Permissions: " + android_util.run_command("adb shell dumpsys package permission {permissions_args}", check_output=True, shell=True))
+        # logger.info("All Permissions: " + str(android_util.get_all_permissions()))
+        # permissions = android_util.get_all_permissions()
+        # permissions_args = " ".join([perm.name for perm in permissions])
+        # print(permissions_args)
+        # logger.info("All Package Permissions: " + android_util.run_command("adb shell dumpsys package permission {permissions_args}", check_output=True, shell=True))
     except Exception as e:
-        logger.error(f"发生错误: {e}", e)
+        logger.error(f"Error occurred: {e}", e)
