@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import frida
 import os
 import threading
 from script_base.log import logger
-from packaging.version import parse as parse_version
+
+# check frida is installed
+try:
+    import frida
+except ImportError:
+    logger.error("Frida Python bindings are not installed. Please install them via 'pip install frida'.")
+
+# check packaging is installed
+try:
+    from packaging.version import parse as parse_version
+except ImportError:
+    logger.error("The 'packaging' library is not installed. Please install it via 'pip install packaging'.")
 
 class FridaScriptExecutor:
     """

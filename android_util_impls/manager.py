@@ -108,5 +108,6 @@ if __name__ == "__main__":
         # permissions_args = " ".join([perm.name for perm in permissions])
         # print(permissions_args)
         # logger.info("All Package Permissions: " + android_util.run_command("adb shell dumpsys package permission {permissions_args}", check_output=True, shell=True))
+        logger.info("Package Flags: " + str(android_util.get_package_flags("com.android.settings")))
     except Exception as e:
         logger.error(f"Error occurred: {e}", e)

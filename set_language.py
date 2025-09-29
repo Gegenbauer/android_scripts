@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-import os
-from script_base.log import logger
-from script_base.frida_utils import FridaScriptExecutor
-from android_util_impls.manager import android_util_manager
 
 # Define the Frida script file name
 FRIDA_SCRIPT_FILE = "set_language.js"
@@ -17,6 +13,11 @@ def set_android_language(language, country, package_name="system_server", device
     :param device_id: The ID of the specific device to connect to.
     """
     # Get the directory of the current script and construct the full path to the Frida script
+    import os
+    from script_base.log import logger
+    from script_base.frida_utils import FridaScriptExecutor
+    from android_util_impls.manager import android_util_manager
+    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     frida_script_path = os.path.join(script_dir, FRIDA_SCRIPT_FILE)
 

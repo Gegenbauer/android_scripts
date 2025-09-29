@@ -1,114 +1,38 @@
 import subprocess
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
-from script_base.utils import run_command, find_key_contains
+from script_base.utils import run_command
 from script_base.log import logger
+from android_util_impls.environment import (
+    get_android_sdk_path,
+    get_android_ndk_path,
+    get_android_platform_tools_path,
+    get_adb_path,
+    get_android_build_tools_path,
+)
 
 
 class AndroidUtilBase:
 
     def get_android_sdk_path(self) -> str:
-        """
-        Get the path of the Android SDK.
-
-        Returns:
-            str: The path of the Android SDK, or an empty string if not set.
-        """
-        sdk_path = os.environ.get("android_sdk_path", "")
-        if not sdk_path:
-            logger.error("Please set the ANDROID_SDK_ROOT environment variable to point to the Android SDK installation directory.")
-        if not os.path.exists(sdk_path):
-            logger.error(
-                f"The specified Android SDK path '{sdk_path}' does not exist. Please check if the path is correct."
-            )
-            return ""
-        return sdk_path
+        return get_android_sdk_path()
 
     def get_android_ndk_path(self) -> str:
-        """
-        Get the path of the Android NDK.
-        Returns:
-            str: The path of the Android NDK, or an empty string if not set.
-        """
-        sdk_path = self.get_android_sdk_path()
-        if not sdk_path:
-            return ""
-        # NDK path is sdk_path + '/ndk'
-        ndk_path = os.path.join(sdk_path, "ndk")
-        if not os.path.exists(ndk_path):
-            logger.error(
-                "Please make sure the Android NDK is installed and ANDROID_SDK_ROOT points to the correct directory."
-            )
-            return ""
-        return ndk_path
+        return get_android_ndk_path()
 
     def get_android_platform_tools_path(self) -> str:
-        """
-        Get the path of the Android platform tools.
-        Returns:
-            str: The path of the Android platform tools, or an empty string if not set.
-        """
-        sdk_path = self.get_android_sdk_path()
-        if not sdk_path:
-            return ""
-        # Platform tools path is sdk_path + '/platform-tools'
-        platform_tools_path = os.path.join(sdk_path, "platform-tools")
-        if not os.path.exists(platform_tools_path):
-            logger.error(
-                "Please make sure the Android SDK is installed and ANDROID_SDK_ROOT points to the correct directory."
-            )
-            return ""
-        return platform_tools_path
+        return get_android_platform_tools_path()
 
     def get_android_build_tools_path(self, version) -> str:
-        """
-        Get the path of the Android build tools.
-        Args:
-            version (str): The version number of the build tools, e.g. '30'.
-        Returns:
-            str: The path of the Android build tools, or an empty string if not set.
-        """
-        sdk_path = self.get_android_sdk_path()
-        if not sdk_path:
-            return ""
-        build_tools_path = os.path.join(sdk_path, "build-tools")
-        # Traverse the build-tools directory to find the specified version. If there is 30.0.3 and the request is 30, consider it a match.
-        if not os.path.exists(build_tools_path):
-            logger.error(
-                "Please make sure the Android SDK is installed and ANDROID_SDK_ROOT points to the correct directory."
-            )
-            return ""
-        for item in os.listdir(build_tools_path):
-            if item.startswith(version):
-                build_tools_path = os.path.join(build_tools_path, item)
-                if os.path.exists(build_tools_path):
-                    return build_tools_path
-        logger.error(
-            f"Could not find the path for Android build tools version {version}. Please check if this version is installed."
-        )
-        return ""
+        return get_android_build_tools_path(version)
 
-    def get_adb_path(self, warning: bool=False) -> str:
-        """
-        Get the path of the adb tool.
-        Returns:
-            str: The path of the adb tool, or an empty string if not set.
-        """
-        adb_path = (
-            os.path.join(self.get_android_platform_tools_path(), "adb")
-            if self.get_android_platform_tools_path()
-            else ""
-        )
-        if not adb_path or not os.path.exists(adb_path):
-            if warning:
-                logger.error(
-                    "Please make sure the adb tool is installed and in the directory specified by ANDROID_PLATFORM_TOOLS_ROOT."
-                )
-        return adb_path
+    def get_adb_path(self, warning: bool = False) -> str:
+        return get_adb_path(warning=warning)
 
-    def get_connected_devices(self, warningForAdb: bool=True) -> list:
+    def get_connected_devices(self, warningForAdb: bool = True) -> list:
         """
         Get the list of connected Android devices.
 
@@ -138,7 +62,9 @@ class AndroidUtilBase:
     # Get the available adb command string
     def get_adb_command(
         self,
-        device: str, print_adb_warning: bool=True, print_device_warning: bool=True
+        device: str,
+        print_adb_warning: bool = True,
+        print_device_warning: bool = True,
     ) -> str:
         """
         Return a command prefix like '/path/to/adb -s device'.
@@ -151,7 +77,9 @@ class AndroidUtilBase:
         adb_path = self.get_adb_path()
         if not adb_path:
             if print_adb_warning:
-                logger.warning("adb tool not detected, please check environment variables and SDK configuration.")
+                logger.warning(
+                    "adb tool not detected, please check environment variables and SDK configuration."
+                )
             return ""
         devices = self.get_connected_devices(warningForAdb=False)
         device_ids = [d.split()[0] for d in devices if d.strip()]
@@ -216,7 +144,7 @@ class AndroidUtilBase:
             logger.error(f"Failed to push file to device {device}: {e}", e)
             return False
 
-    def is_rooted(self, device: str="") -> bool:
+    def is_rooted(self, device: str = "") -> bool:
         """
         Check if the device has root access.
 
@@ -236,10 +164,12 @@ class AndroidUtilBase:
             )
             return "uid=0(root)" in result
         except Exception as e:
-            logger.error(f"Error occurred while checking if device {device} is rooted: {e}", e)
+            logger.error(
+                f"Error occurred while checking if device {device} is rooted: {e}", e
+            )
             return False
 
-    def run_adb_as_root(self, device: str="") -> bool:
+    def run_adb_as_root(self, device: str = "") -> bool:
         """
         Restart the adb service with root privileges.
 
@@ -260,7 +190,7 @@ class AndroidUtilBase:
             logger.error(f"Failed to obtain root access on device {device}: {e}", e)
             return False
 
-    def is_adb_running_as_root(self, device: str="") -> bool:
+    def is_adb_running_as_root(self, device: str = "") -> bool:
         """
         Check if adb is running as root.
 
@@ -278,7 +208,10 @@ class AndroidUtilBase:
             result = run_command(command, check_output=True, shell=True)
             return "uid=0(root)" in result
         except Exception as e:
-            logger.error(f"Error occurred while checking if adb is running as root on device {device}: {e}", e)
+            logger.error(
+                f"Error occurred while checking if adb is running as root on device {device}: {e}",
+                e,
+            )
             return False
 
     def remount(self, device: str) -> bool:
@@ -299,7 +232,9 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"Failed to remount the system partition on device {device}: {e}", e)
+            logger.error(
+                f"Failed to remount the system partition on device {device}: {e}", e
+            )
             return False
 
     def has_remount(self, device: str) -> bool:
@@ -320,7 +255,10 @@ class AndroidUtilBase:
             result = run_command(command, check_output=True, shell=True)
             return "rw" in result
         except Exception as e:
-            logger.error(f"Error occurred while checking if device {device} supports remounting: {e}", e)
+            logger.error(
+                f"Error occurred while checking if device {device} supports remounting: {e}",
+                e,
+            )
             return False
 
     def get_device_sdk_version(self, device="") -> str:
@@ -333,7 +271,9 @@ class AndroidUtilBase:
         Returns:
             str: The SDK version of the device, or an empty string if not found.
         """
-        adb_cmd = self.get_adb_command(device, print_adb_warning=True, print_device_warning=True)
+        adb_cmd = self.get_adb_command(
+            device, print_adb_warning=True, print_device_warning=True
+        )
         if not adb_cmd:
             return ""
         try:
@@ -341,9 +281,11 @@ class AndroidUtilBase:
             result = run_command(command, check_output=True, shell=True)
             return result.strip()
         except Exception as e:
-            logger.error(f"Error occurred while getting the SDK version of the device: {e}", e)
+            logger.error(
+                f"Error occurred while getting the SDK version of the device: {e}", e
+            )
             raise
-        
+
     def get_device_brand(self, device="") -> str:
         """
         Get the brand information of the connected Android device.
@@ -354,7 +296,9 @@ class AndroidUtilBase:
         Returns:
             str: The brand information of the device, or an empty string if not found.
         """
-        adb_cmd = self.get_adb_command(device, print_adb_warning=True, print_device_warning=True)
+        adb_cmd = self.get_adb_command(
+            device, print_adb_warning=True, print_device_warning=True
+        )
         if not adb_cmd:
             return ""
         try:
@@ -362,7 +306,10 @@ class AndroidUtilBase:
             result = run_command(command, check_output=True, shell=True)
             return result.strip()
         except Exception as e:
-            logger.error(f"Error occurred while getting the brand information of the device: {e}", e)
+            logger.error(
+                f"Error occurred while getting the brand information of the device: {e}",
+                e,
+            )
             raise
 
     def get_focused_app_package(self, device="") -> str:
@@ -397,7 +344,10 @@ class AndroidUtilBase:
                     return match.group(1)
             return ""
         except Exception as e:
-            logger.error(f"Error occurred while getting the package name of the currently focused application: {e}", e)
+            logger.error(
+                f"Error occurred while getting the package name of the currently focused application: {e}",
+                e,
+            )
             raise
         return ""
 
@@ -415,7 +365,9 @@ class AndroidUtilBase:
         if not adb_cmd:
             return ""
         try:
-            command = f'{adb_cmd} shell "dumpsys activity activities | grep mFocusedApp"'
+            command = (
+                f'{adb_cmd} shell "dumpsys activity activities | grep mFocusedApp"'
+            )
             result = run_command(command, shell=True, check_output=True)
             # mFocusedApp=ActivityRecord{def7ea1 u0 com.android.launcher3/.Launcher t55}
             # Get com.android.launcher3/.Launcher
@@ -434,7 +386,10 @@ class AndroidUtilBase:
                     break
             return ""
         except Exception as e:
-            logger.error(f"Error occurred while getting the name of the currently focused Activity: {e}", e)
+            logger.error(
+                f"Error occurred while getting the name of the currently focused Activity: {e}",
+                e,
+            )
             raise
 
     def get_focused_window(self, device="") -> str:
@@ -451,7 +406,9 @@ class AndroidUtilBase:
         if not adb_cmd:
             return ""
         try:
-            command = f'{adb_cmd} shell "dumpsys activity activities | grep mFocusedWindow"'
+            command = (
+                f'{adb_cmd} shell "dumpsys activity activities | grep mFocusedWindow"'
+            )
             result = run_command(command, shell=True, check_output=True)
             first_line = result.splitlines()[0] if result else ""
             if first_line:
@@ -461,10 +418,13 @@ class AndroidUtilBase:
                     return window_info
             return ""
         except Exception as e:
-            logger.error(f"Error occurred while getting the name of the currently focused window: {e}", e)
+            logger.error(
+                f"Error occurred while getting the name of the currently focused window: {e}",
+                e,
+            )
             raise
         return ""
-    
+
     def get_resumed_fragment(self, device="") -> str:
         """
         Get the name of the currently focused Fragment.
@@ -482,19 +442,25 @@ class AndroidUtilBase:
             focused_package = self.get_focused_app_package(device)
             if not focused_package:
                 return ""
-            command = f"adb shell \"dumpsys activity {focused_package}|grep 'mResumed=true'\""
+            command = (
+                f"adb shell \"dumpsys activity {focused_package}|grep 'mResumed=true'\""
+            )
             result = run_command(command, shell=True, check_output=True)
             # Find the part containing "Active Fragments" and extract SoundSettings
             # mCreated=true mResumed=true mStopped=false    Active Fragments:    SoundSettings{985054f} (287240d6-e623-4d37-859a-3fec6fc3d8f4) id=0x7f0a02b6}
             for line in result.splitlines():
                 if "Active Fragments" in line:
                     import re
+
                     match = re.search(r"Active Fragments:\s+([^\s{]+)", line)
                     if match:
                         return match.group(1)
             return ""
         except Exception as e:
-            logger.error(f"Error occurred while getting the name of the currently focused Fragment: {e}", e)
+            logger.error(
+                f"Error occurred while getting the name of the currently focused Fragment: {e}",
+                e,
+            )
             raise
 
     def find_apk_path(self, keyword: str, device="") -> list:
@@ -528,7 +494,7 @@ class AndroidUtilBase:
             raise
         return []
 
-    def get_app_version(self, package_name: str, device: str="") -> str:
+    def get_app_version(self, package_name: str, device: str = "") -> str:
         """
         Get the version name of the specified application.
 
@@ -544,9 +510,7 @@ class AndroidUtilBase:
             return ""
 
         try:
-            command = (
-                f'{adb_command} shell "dumpsys package {package_name} | grep versionName"'
-            )
+            command = f'{adb_command} shell "dumpsys package {package_name} | grep versionName"'
             result = run_command(command, check_output=True, shell=True)
             # result may contain multiple lines, take the first line
             first_line = result.splitlines()[0] if result else ""
@@ -556,7 +520,10 @@ class AndroidUtilBase:
                 return version_name
             logger.info(f"Version name of application {package_name} not found.")
         except Exception as e:
-            logger.error(f"Error occurred while getting the version name of application {package_name}: {e}", e)
+            logger.error(
+                f"Error occurred while getting the version name of application {package_name}: {e}",
+                e,
+            )
             raise
 
         return ""
@@ -581,57 +548,27 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Error occurred while clearing data for application {package_name}: {e}", e)
+            logger.error(
+                f"Error occurred while clearing data for application {package_name}: {e}",
+                e,
+            )
             raise
 
-    def set_debugger_app(self, package_name: str, device: str="") -> bool:
-        """
-        Set the specified application as the debugger application.
-
-        Args:
-            package_name (str): The package name of the application to set as the debugger application.
-            device (str): The ID of the device (optional).
-
-        Returns:
-            bool: Whether the application was successfully set as the debugger application.
-        """
+    def set_debugger_app(self, package_name: str, device: str = "") -> bool:
         adb_command = self.get_adb_command(device)
         if not adb_command:
             return False
+        from activity_manager_service import set_debugger_app
 
-        try:
-            command = f"{adb_command} shell am set-debug-app -w {package_name}"
-            run_command(command, shell=True)
-            return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Error occurred while setting application {package_name} as the debugger application: {e}", e)
-            raise
-
-        return False
+        return set_debugger_app(adb_command, package_name)
 
     def remove_debugger_app(self, device="") -> bool:
-        """
-        Remove the currently set debugger application.
-
-        Args:
-            device (str): The ID of the device (optional).
-
-        Returns:
-            bool: Whether the debugger application was successfully removed.
-        """
         adb_command = self.get_adb_command(device)
         if not adb_command:
             return False
+        from activity_manager_service import remove_debugger_app
 
-        try:
-            command = f"{adb_command} shell am clear-debug-app"
-            run_command(command, ignore_command_error=True, shell=True)
-            return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Error occurred while removing the debugger application: {e}", e)
-            raise
-
-        return False
+        return remove_debugger_app(adb_command)
 
     def get_pid_of_app(self, package_name: str, device="") -> int:
         """
@@ -654,7 +591,7 @@ class AndroidUtilBase:
                 command, shell=True, check_output=True, ignore_command_error=True
             )
             # check if result is a number
-            
+
             if result.strip().isdigit():
                 pid = int(result.strip())
                 return pid
@@ -664,7 +601,10 @@ class AndroidUtilBase:
             logger.info(f"PID of application {package_name} not found.")
             return -1
         except Exception as e:
-            logger.error(f"Error occurred while getting the PID of application {package_name}: {e}", e)
+            logger.error(
+                f"Error occurred while getting the PID of application {package_name}: {e}",
+                e,
+            )
             raise
 
         return -1
@@ -685,9 +625,7 @@ class AndroidUtilBase:
             return False
 
         try:
-            command = (
-                f'{adb_command} shell "dumpsys package {package_name} | grep versionCode"'
-            )
+            command = f'{adb_command} shell "dumpsys package {package_name} | grep versionCode"'
             result = run_command(command, shell=True, check_output=True)
             # result may contain multiple lines, take the first line
             first_line = result.splitlines()[0] if result else ""
@@ -697,7 +635,10 @@ class AndroidUtilBase:
                 return version_code
             logger.info(f"Version code of application {package_name} not found.")
         except Exception as e:
-            logger.error(f"Error occurred while getting the version code of application {package_name}: {e}", e)
+            logger.error(
+                f"Error occurred while getting the version code of application {package_name}: {e}",
+                e,
+            )
             raise
 
         return ""
@@ -728,7 +669,9 @@ class AndroidUtilBase:
             logger.error(f"Error: Failed to get device timezone: {e}", e)
             raise
 
-    def get_utc_milliseconds_from_device(self, local_time_str, tz_name, device="") -> int:
+    def get_utc_milliseconds_from_device(
+        self, local_time_str, tz_name, device=""
+    ) -> int:
         """
         Let the device use its own timezone database to convert local time to UTC milliseconds.
         """
@@ -752,12 +695,15 @@ class AndroidUtilBase:
             return utc_seconds * 1000
         except ValueError as e:
             logger.error(
-                f"Error: Failed to parse '{utc_seconds_str.strip()}' returned by the device as an integer.", e
+                f"Error: Failed to parse '{utc_seconds_str.strip()}' returned by the device as an integer.",
+                e,
             )
             raise
         except Exception as e:
             logger.error(f"Error: Failed to convert time on device: {e}", e)
-            logger.error("Please check if the 'date' command on the device supports the '-d' option.")
+            logger.error(
+                "Please check if the 'date' command on the device supports the '-d' option."
+            )
             raise
 
     def get_device_cpu_cores_count(self, device="") -> int:
@@ -783,7 +729,9 @@ class AndroidUtilBase:
             cpu_cores = len(cpu_dirs)
             return cpu_cores
         except Exception as e:
-            logger.error(f"Error: Failed to get the number of CPU cores on the device: {e}", e)
+            logger.error(
+                f"Error: Failed to get the number of CPU cores on the device: {e}", e
+            )
             raise
 
     def get_biggest_cpu_core(self, device="") -> int:
@@ -819,11 +767,15 @@ class AndroidUtilBase:
                     )
                     max_freqs.append(int(freq.strip()))
                 except Exception as e:
-                    logger.error(f"Error: Failed to get the maximum frequency of CPU{i}: {e}", e)
+                    logger.error(
+                        f"Error: Failed to get the maximum frequency of CPU{i}: {e}", e
+                    )
             biggest_core = max(max_freqs) if max_freqs else 0
             return biggest_core
         except Exception as e:
-            logger.error(f"Error: Failed to get the highest CPU core on the device: {e}", e)
+            logger.error(
+                f"Error: Failed to get the highest CPU core on the device: {e}", e
+            )
             raise
 
     def get_device_architecture(self, device="") -> str:
@@ -840,7 +792,9 @@ class AndroidUtilBase:
             arch = result.strip()
             return arch
         except Exception as e:
-            logger.error(f"Error: Failed to get the CPU architecture of the device: {e}", e)
+            logger.error(
+                f"Error: Failed to get the CPU architecture of the device: {e}", e
+            )
             raise
 
     def get_device_cpu_model(self, device="") -> str:
@@ -879,7 +833,9 @@ class AndroidUtilBase:
             opengl_es_version = result.strip()
             return opengl_es_version
         except Exception as e:
-            logger.error(f"Error: Failed to get the OpenGL ES version of the device: {e}", e)
+            logger.error(
+                f"Error: Failed to get the OpenGL ES version of the device: {e}", e
+            )
             raise
 
     def set_night_mode(self, mode: str, device="") -> bool:
@@ -917,7 +873,9 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"Failed to grant permission {permission} on device {device}: {e}", e)
+            logger.error(
+                f"Failed to grant permission {permission} on device {device}: {e}", e
+            )
             return False
 
     def check_permission(self, permission: str, package_name: str, device="") -> bool:
@@ -953,32 +911,23 @@ class AndroidUtilBase:
             return False
         except Exception as e:
             logger.error(
-                f"Failed to check if application {package_name} is a persistent app on device {device}: {e}", e
+                f"Failed to check if application {package_name} is a persistent app on device {device}: {e}",
+                e,
             )
             return False
 
     def kill_process(self, package_name: str, device="") -> bool:
-        """
-        Kill the specified process on the device.
-
-        Args:
-            device (str): The ID of the device.
-            package_name (str): The package name of the process to kill.
-
-        Returns:
-            bool: Whether the process was successfully killed.
-        """
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
             return False
-        try:
-            # TODO Confirm if persistent app needs to be distinguished
-            command = f"{adb_cmd} shell am force-stop {package_name}"
-            run_command(command, shell=True)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to kill process {package_name} on device {device}: {e}", e)
-            return False
+        from activity_manager_service import kill_process
+
+        result = kill_process(adb_cmd, package_name)
+        if not result:
+            logger.error(
+                f"Failed to kill process of application {package_name} on device {device}"
+            )
+        return result
 
     def uninstall_app(self, package_name: str, device="") -> bool:
         """
@@ -999,7 +948,10 @@ class AndroidUtilBase:
             run_command(command, shell=True)
             return True
         except Exception as e:
-            logger.error(f"Failed to uninstall application {package_name} on device {device}: {e}", e)
+            logger.error(
+                f"Failed to uninstall application {package_name} on device {device}: {e}",
+                e,
+            )
             return False
 
     def force_gc(self, package_name: str, device="") -> bool:
@@ -1019,7 +971,9 @@ class AndroidUtilBase:
         try:
             pid = self.get_pid_of_app(package_name, device)
             if pid == -1:
-                logger.error(f"Cannot perform garbage collection: Application {package_name} is not running on device {device}.")
+                logger.error(
+                    f"Cannot perform garbage collection: Application {package_name} is not running on device {device}."
+                )
                 return False
             command = f"{adb_cmd} shell kill -10 {pid}"
             run_command(command, shell=True)
@@ -1028,10 +982,12 @@ class AndroidUtilBase:
             logger.error(str(e))
             return False
         except Exception as e:
-            logger.error(f"Failed to force garbage collection on device {device}: {e}", e)
+            logger.error(
+                f"Failed to force garbage collection on device {device}: {e}", e
+            )
             return False
 
-    def is_remote_path_file(self, remote_path: str, device: str="") -> bool:
+    def is_remote_path_file(self, remote_path: str, device: str = "") -> bool:
         """
         Check if the remote path on the device is a file.
 
@@ -1046,16 +1002,19 @@ class AndroidUtilBase:
         if not adb_cmd:
             return False
         try:
-            command = f"{adb_cmd} shell [ -f {remote_path} ] && echo 'true' || echo 'false'"
+            command = (
+                f"{adb_cmd} shell [ -f {remote_path} ] && echo 'true' || echo 'false'"
+            )
             result = run_command(command, check_output=True, shell=True)
             return result.strip() == "true"
         except Exception as e:
             logger.error(
-                f"Error occurred while checking if the path {remote_path} on device {device} is a file: {e}", e
+                f"Error occurred while checking if the path {remote_path} on device {device} is a file: {e}",
+                e,
             )
             return False
 
-    def is_remote_path_directory(self, remote_path: str, device: str="") -> bool:
+    def is_remote_path_directory(self, remote_path: str, device: str = "") -> bool:
         """
         Check if the remote path on the device is a directory.
 
@@ -1070,12 +1029,15 @@ class AndroidUtilBase:
         if not adb_cmd:
             return False
         try:
-            command = f"{adb_cmd} shell [ -d {remote_path} ] && echo 'true' || echo 'false'"
+            command = (
+                f"{adb_cmd} shell [ -d {remote_path} ] && echo 'true' || echo 'false'"
+            )
             result = run_command(command, check_output=True, shell=True)
             return result.strip() == "true"
         except Exception as e:
             logger.error(
-                f"Error occurred while checking if the path {remote_path} on device {device} is a directory: {e}", e
+                f"Error occurred while checking if the path {remote_path} on device {device} is a directory: {e}",
+                e,
             )
             return False
 
@@ -1183,6 +1145,7 @@ class AndroidUtilBase:
             for key, value in permissions_node.items():
                 # Use regular expressions to extract the permission name
                 import re
+
                 match = re.match(r"Permission \[(.+?)\]", key)
                 if match:
                     permission_name = match.group(1)
@@ -1209,17 +1172,16 @@ class AndroidUtilBase:
                 if key.startswith("AppOp Permission "):
                     permission_name = key.replace("AppOp Permission ", "").strip()
                     app_op_permissions[permission_name] = list(value.keys())
-                    package_permissions.append(
-                        PermissionInfo(
-                            name=permission_name
-                        )
-                    )
+                    package_permissions.append(PermissionInfo(name=permission_name))
             # Merge results
             return package_permissions
         except Exception as e:
-            logger.error(f"Error occurred while getting all application permission information on the device: {e}", e)
+            logger.error(
+                f"Error occurred while getting all application permission information on the device: {e}",
+                e,
+            )
             raise
-        
+
     def check_file_or_directory_exists(self, remote_path: str, device="") -> bool:
         """
         Check if the specified file or directory exists on the device.
@@ -1234,15 +1196,18 @@ class AndroidUtilBase:
         if not adb_cmd:
             return False
         try:
-            command = f"{adb_cmd} shell [ -e {remote_path} ] && echo 'true' || echo 'false'"
+            command = (
+                f"{adb_cmd} shell [ -e {remote_path} ] && echo 'true' || echo 'false'"
+            )
             result = run_command(command, check_output=True, shell=True)
             return result.strip() == "true"
         except Exception as e:
             logger.error(
-                f"Error occurred while checking if the path {remote_path} on device {device} exists: {e}", e
+                f"Error occurred while checking if the path {remote_path} on device {device} exists: {e}",
+                e,
             )
             return False
-        
+
     def delete_file_or_directory(self, remote_path: str, device="") -> bool:
         """
         Delete the specified file or directory on the device.
@@ -1262,10 +1227,11 @@ class AndroidUtilBase:
             return True
         except Exception as e:
             logger.error(
-                f"Error occurred while deleting the path {remote_path} on device {device}: {e}", e
+                f"Error occurred while deleting the path {remote_path} on device {device}: {e}",
+                e,
             )
             return False
-    
+
     def create_directory(self, remote_path: str, accessMode: str, device="") -> bool:
         """
         Create a directory on the device.
@@ -1289,10 +1255,11 @@ class AndroidUtilBase:
             return True
         except Exception as e:
             logger.error(
-                f"Error occurred while creating directory {remote_path} on device {device}: {e}", e
+                f"Error occurred while creating directory {remote_path} on device {device}: {e}",
+                e,
             )
             return False
-        
+
     def change_access_mode(self, remote_path: str, accessMode: str, device="") -> bool:
         """
         Change the access mode of a file or directory on the device.
@@ -1312,21 +1279,75 @@ class AndroidUtilBase:
             return True
         except Exception as e:
             logger.error(
-                f"Error occurred while changing access mode of {remote_path} on device {device}: {e}", e
+                f"Error occurred while changing access mode of {remote_path} on device {device}: {e}",
+                e,
             )
             return False
-    
-        
+
+    def set_binary_xml_enabled(self, enabled: bool, device="") -> bool:
+        """
+        Enable or disable binary XML parsing on the device.
+        Args:
+            device (str): The ID of the device.
+            enabled (bool): Whether to enable or disable binary XML parsing.
+        Returns:
+            bool: Whether the operation was successful.
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return False
+        try:
+            value = "true" if enabled else "false"
+            command = f"{adb_cmd} shell setprop persist.sys.binary_xml {value}"
+            run_command(command, shell=True)
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error occurred while setting binary XML parsing to {enabled} on device {device}: {e}",
+                e,
+            )
+            return False
+
+    def get_package_flags(self, package_name: str, device="") -> dict:
+        """
+        Get the flags of the specified application.
+
+        Args:
+            package_name (str): The package name of the application to query.
+            device (str): The ID of the device (optional).
+
+        Returns:
+            dict: A dictionary containing the flags of the application, or an empty dictionary if not found.
+        """
+        adb_command = self.get_adb_command(device)
+        if not adb_command:
+            return {}
+
+        try:
+            from android_util_impls.package_manager_service import get_flags_for_package
+
+            flags = get_flags_for_package(adb_command, package_name)
+            return flags
+        except Exception as e:
+            logger.error(
+                f"Error occurred while getting the flags of application {package_name}: {e}",
+                e,
+            )
+            raise
+
+        return {}
+
+
 class PermissionInfo:
 
     def __init__(self, name="", sourcePackage="", prot=""):
         self.name = name
         self.sourcePackage = sourcePackage
         self.prot = prot
-    
+
     def __repr__(self):
         return f"PermissionInfo(name={self.name}, sourcePackage={self.sourcePackage}, prot={self.prot})"
-        
+
 
 class PackagePermissionInfo:
 
@@ -1336,6 +1357,6 @@ class PackagePermissionInfo:
         self.grantedPermissions = []  # List of permission names
         self.deniedPermissions = []  # List of permission names
         self.definedPermissions = []  # List of PermissionInfo objects
-    
+
     def __repr__(self):
         return f"PackagePermissionInfo(packageName={self.packageName}, requestedPermissions={self.requestedPermissions}, grantedPermissions={self.grantedPermissions}, deniedPermissions={self.deniedPermissions}, definedPermissions={self.definedPermissions})"

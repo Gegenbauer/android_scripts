@@ -3,7 +3,6 @@
 Comprehensive adb utility script, integrating set_time, show_focused_activity, and android_file_viewer features.
 """
 import os
-from script_base import log
 from script_base.script_manager import ScriptManager, Command
 from android_util_impls.manager import android_util_manager
 
@@ -17,7 +16,6 @@ from script_base.utils import (
     timestamp,
 )
 from script_base.log import logger
-from script_base.frida_utils import FridaScriptExecutor
 from export_bitmaps import export_bitmaps
 from set_language import set_android_language
 
@@ -622,6 +620,63 @@ class DebuggerCommand(Command):
                 logger.error("Failed to clear the debugger app.")
 
 
+class PackageManagerCommand(Command):
+    """
+    Package Manager Service operations for Android applications.
+    
+    Provides various package manager functionalities including:
+    - View application flags (system flags, private flags, package flags)
+    - Future: permissions, package info, etc.
+    """
+
+    def add_arguments(self, parser):
+        subparsers = parser.add_subparsers(dest="action", required=True, help="Package manager action to perform")
+
+        # Sub-parser for 'flags'
+        parser_flags = subparsers.add_parser("flags", help="Show application flags (system, private, package flags)")
+        group = parser_flags.add_mutually_exclusive_group(required=True)
+        group.add_argument("-p", "--package", help="The package name of the target application")
+        group.add_argument(
+            "--focused",
+            action="store_true",
+            help="Show flags for the currently focused application"
+        )
+
+    def execute(self, args):
+        android_util = android_util_manager.select()
+        if not android_util.get_connected_devices():
+            logger.error("No connected devices detected")
+            return
+
+        if args.action == "flags":
+            package_name = args.package
+            if args.focused:
+                logger.info("Getting the package name of the currently focused app...")
+                focused_package = android_util.get_focused_app_package()
+                if focused_package:
+                    package_name = focused_package
+                    logger.info(f"Successfully got focused app package name: {package_name}")
+                else:
+                    logger.error("Could not get the currently focused app package name. Please ensure the target app is in the foreground.")
+                    return
+            
+            if not package_name:
+                logger.error("Package name is required to get application flags.")
+                return
+
+            try:
+                logger.info(f"Getting flags for application: {package_name}")
+                flags = android_util.get_package_flags(package_name)
+                
+                if not flags:
+                    logger.warning(f"No flags found for application {package_name}. Application may not be installed.")
+                    return
+
+                logger.info(f"Flags for application {package_name}: {flags}")
+            except Exception as e:
+                logger.error(f"Failed to get flags for application {package_name}: {e}", exc=e)
+
+
 if __name__ == "__main__":
     # Test if android_sdk_path exists in environment variables
     manager = ScriptManager(
@@ -680,6 +735,11 @@ if __name__ == "__main__":
         "debugger",
         DebuggerCommand(),
         help_text="Set or clear the application to be debugged."
+    )
+    manager.register_command(
+        "package-manager",
+        PackageManagerCommand(),
+        help_text="Package Manager Service operations (flags, permissions, etc.)"
     )
 
     manager.run()
