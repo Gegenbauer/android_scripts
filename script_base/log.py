@@ -12,7 +12,7 @@ class Logger:
     Logger based on standard logging, supporting custom format and exception stack trace.
     Each Logger instance is independent and can have its own format.
     """
-    def __init__(self, level=logging.DEBUG, simple=False, name=None):
+    def __init__(self, level=logging.INFO, simple=False, name=None):
         # Use a unique logger name if not specified, to avoid handler/formatter sharing
         if name is None:
             name = f"project_logger_{id(self)}"

@@ -66,7 +66,7 @@ def export_bitmaps(package, output_dir=None, frida_script="export_bitmaps.js", d
 
     # 3. Pull exported bitmaps from device
     try:
-        run_command(["adb", "pull", android_save_dir, out_dir], check_output=False)
+        run_command(["adb", "-s", executor.device, "pull", android_save_dir, out_dir], check_output=False)
         logger.info(f"Pulled exported bitmaps to {out_dir}")
     except Exception as e:
         logger.error(f"Failed to pull bitmaps: {e}", exc_info=True)

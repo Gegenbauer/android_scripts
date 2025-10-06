@@ -9,27 +9,27 @@ from script_base.log import logger
 
 def get_current_timestamp() -> int:
     """
-    获取当前的 Unix 时间戳。
+    Get the current Unix timestamp.
 
     Returns:
-        int: 当前的 Unix 时间戳。
+        int: Current Unix timestamp.
     """
     return int(datetime.datetime.now().timestamp())
 
 
 def ensure_directory_exists(path: str):
     """
-    确保指定的目录存在，如果不存在则创建。
+    Ensure that the specified directory exists. If it does not exist, create it.
 
     Args:
-        path (str): 要检查或创建的目录路径。
+        path (str): The directory path to ensure exists.
     """
     if not os.path.exists(path):
         os.makedirs(path)
-        logger.debug(f"创建目录: {path}")
+        logger.debug(f"creating dir: {path}")
 
 
-def run_command(command: list, cwd: str=None, check_output: bool=True, shell: bool=False, text: bool=True, ignore_command_error: bool=False) -> str:
+def run_command(command: list|str, cwd: str=None, check_output: bool=True, shell: bool=False, text: bool=True, ignore_command_error: bool=False) -> str:
     """
     Run a shell command and return its standard output.
     
@@ -47,6 +47,7 @@ def run_command(command: list, cwd: str=None, check_output: bool=True, shell: bo
         str: The standard output of the command, or an empty string if check_output is False.
     """
     input_params = {"command": command, "cwd": cwd, "check_output": check_output, "shell": shell, "text": text}
+    logger.debug("input_params: " + str(input_params))
     try:
         # Use the more modern and robust subprocess.run
         # capture_output=True captures both stdout and stderr
@@ -103,6 +104,12 @@ def open_in_file_manager(path: str):
         import shutil
         if shutil.which("nautilus"):
             run_command(["nautilus", path], check_output=False)
+        elif shutil.which("thunar"):
+            run_command(["thunar", path], check_output=False)
+        elif shutil.which("dolphin"):
+            run_command(["dolphin", path], check_output=False)
+        elif shutil.which("pcmanfm"):
+            run_command(["pcmanfm", path], check_output=False)
         else:
             run_command(["xdg-open", path], check_output=False)
 
@@ -112,14 +119,13 @@ def open_in_vscode(file_path: str, line: Optional[int]=None):
     try:
         run_command(["code", "-g", target], check_output=False)
     except Exception as e:
-        logger.error(f"无法通过 VSCode 打开文件: {e}", e)
+        logger.error(f"failed to open file in VSCode: {e}", e)
         raise
 
 
 from typing import Optional
 
 
-# ===== 通用工具函数 from adb.py =====
 def cache_root_arg_to_path(cache_root_arg: Optional[str]) -> str:
     base = cache_root_arg if cache_root_arg else os.environ.get("cache_files_dir", ".")
     return os.path.abspath(base)
@@ -141,8 +147,12 @@ def timestamp() -> str:
 
 def find_key_contains(d: dict, key_part: str) -> Optional[str]:
     """
-    在字典 d 中查找包含 key_part 的键，返回第一个匹配的键。
-    如果没有找到，返回 None。
+    Find a key in dict contains key_part (case insensitive).
+    return None if not found.
+
+    Args:
+        d (dict): The dictionary to search.
+        key_part (str): The substring to search for within the dictionary keys.
     """
     key_part_lower = key_part.lower()
     for k in d.keys():

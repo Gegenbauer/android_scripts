@@ -37,6 +37,7 @@ class ScriptManager:
             help=short_help, # Short help for command line overview
             description=full_doc # Full description for specific command help
         )
+        parser_command.add_argument("--debug", action="store_true", help="Enable debug logging for all commands.")
         command_instance.add_arguments(parser_command)
         self.commands[command_name] = command_instance
 
@@ -45,6 +46,12 @@ class ScriptManager:
         Parse command-line arguments and execute the corresponding command.
         """
         args = self.parser.parse_args()
+
+        if getattr(args, "debug", False):
+            import logging
+            from script_base.log import logger as default_logger
+            logger.set_level(logging.DEBUG)
+            default_logger.set_level(logging.DEBUG)
 
         if args.command in self.commands:
             command_instance = self.commands[args.command]

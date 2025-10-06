@@ -17,6 +17,9 @@ from android_util_impls.environment import (
 
 class AndroidUtilBase:
 
+    def __init__(self, device: str = None):
+        self.device = device
+
     def get_android_sdk_path(self) -> str:
         return get_android_sdk_path()
 
@@ -58,6 +61,20 @@ class AndroidUtilBase:
         except Exception as e:
             logger.error(f"Error occurred while getting connected devices: {e}", e)
             raise
+        
+    def get_connected_device_id(self, warningForAdb: bool = True) -> str:
+        """
+        Get the ID of the first connected Android device.
+
+        Returns:
+            str: The ID of the first connected device, or an empty string if no devices are connected.
+        """
+        if self.device != None and self.device != "":
+            return self.device
+        devices = self.get_connected_devices(warningForAdb)
+        if devices:
+            return devices[0].split()[0]
+        return ""
 
     # Get the available adb command string
     def get_adb_command(
@@ -74,6 +91,8 @@ class AndroidUtilBase:
         - If no device, return an empty string.
         - If device is not in the connected devices, return the first connected device and optionally print a warning.
         """
+        if device is None:
+            device = self.device or ""
         adb_path = self.get_adb_path()
         if not adb_path:
             if print_adb_warning:
@@ -425,7 +444,7 @@ class AndroidUtilBase:
             raise
         return ""
 
-    def get_resumed_fragment(self, device="") -> str:
+    def get_resumed_fragment2(self, device="") -> str:
         """
         Get the name of the currently focused Fragment.
 
@@ -443,7 +462,7 @@ class AndroidUtilBase:
             if not focused_package:
                 return ""
             command = (
-                f"adb shell \"dumpsys activity {focused_package}|grep 'mResumed=true'\""
+                f'{adb_cmd} shell "dumpsys activity {focused_package} activities | grep mResumed=true"'
             )
             result = run_command(command, shell=True, check_output=True)
             # Find the part containing "Active Fragments" and extract SoundSettings
@@ -462,6 +481,36 @@ class AndroidUtilBase:
                 e,
             )
             raise
+
+    def get_resumed_fragment(self, device="") -> str:
+        """
+        Get the name of the currently resumed Fragment from a local dump file.
+
+        This function find resumed fragments from command "adb shell dumpsys activity activities"
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return ""
+        import re
+        try:
+            command = f"{adb_cmd} shell dumpsys activity activities"
+            output = run_command(command, check_output=True, shell=True)
+            # Find all activities with mResumed=true
+            activity_blocks = re.split(r'TASK \d+:', output)[1:]
+            for block in activity_blocks:
+                # Find all fragments in this activity block
+                for frag in re.finditer(r'([A-Za-z0-9_]+Fragment\{[^\}]+\})', block):
+                    frag_block = frag.group(1)
+                    frag_name_match = re.match(r'([A-Za-z0-9_]+Fragment)', frag_block)
+                    frag_name = frag_name_match.group(1) if frag_name_match else None
+                    state_match = re.search(r'mState=(\d+)', block)
+                    state = int(state_match.group(1)) if state_match else None
+                    if state and state >= 5:
+                        return frag_name
+            return ""
+        except Exception as e:
+            logger.error(f"Error occurred while getting resumed fragments: {e}", e)
+            return ""
 
     def find_apk_path(self, keyword: str, device="") -> list:
         """
@@ -1336,6 +1385,42 @@ class AndroidUtilBase:
             raise
 
         return {}
+
+    def get_apk_path(self, package_name: str, device="") -> str:
+        """
+        Get the APK file path of the specified application on the device.
+
+        Args:
+            package_name (str): The package name of the application.
+            device (str): The ID of the device (optional).
+
+        Returns:
+            str: The APK file path on the device, or an empty string if not found.
+        """
+        adb_command = self.get_adb_command(device)
+        if not adb_command:
+            return ""
+
+        try:
+            command = f'{adb_command} shell pm path {package_name}'
+            result = run_command(command, check_output=True, shell=True)
+            
+            # Result format: package:/data/app/com.example.app/base.apk
+            for line in result.splitlines():
+                if line.startswith("package:"):
+                    apk_path = line.replace("package:", "").strip()
+                    return apk_path
+                    
+            logger.warning(f"APK path not found for package: {package_name}")
+            return ""
+        except Exception as e:
+            logger.error(
+                f"Error occurred while getting APK path for package {package_name}: {e}",
+                e,
+            )
+            raise
+
+        return ""
 
 
 class PermissionInfo:

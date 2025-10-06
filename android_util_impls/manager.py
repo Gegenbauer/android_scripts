@@ -24,14 +24,15 @@ class AndroidUtilManager:
         self._impls.append((impl_class, android_version, brand))
         logger.info(f"Registered implementation: {impl_class.__name__}, version={android_version}, brand={brand}")
 
-    def select(self):
+    def select(self, device: str = None):
         """
         Select the most suitable implementation based on device_info.
         device_info: dict, must contain 'android_version', 'brand'
         """
+        logger.debug(f"Selecting implementation for device: {device}")
         default_impl = self._impls[0][0]()
-        version = default_impl.get_device_sdk_version()
-        brand = default_impl.get_device_brand()
+        version = default_impl.get_device_sdk_version(device=device)
+        brand = default_impl.get_device_brand(device=device)
         for impl, v, b in self._impls:
             if (v is None or v == version) and (b is None or b.lower() == (brand or '').lower()):
                 return impl()
@@ -42,7 +43,7 @@ class AndroidUtilManager:
             if b is None or b.lower() == (brand or '').lower():
                 return impl()
         if self._impls:
-            return self._impls[0][0]()
+            return self._impls[0][0](device=device)
         raise RuntimeError("No AndroidUtil implementation registered")
 
 
@@ -66,6 +67,7 @@ if __name__ == "__main__":
         logger.info(f"APK Paths containing 'example':{android_util.find_apk_path('settings')}")
         logger.info(f"Focused Activity:{android_util.get_focused_activity()}")
         logger.info(f"Focused Window:{android_util.get_focused_window()}")
+        logger.info(f"Focused Fragment:{android_util.get_resumed_fragment()}")
         logger.info(
             f"App Version for 'com.android.settings':{android_util.get_app_version('com.android.settings')}"
         )
@@ -76,11 +78,11 @@ if __name__ == "__main__":
             logger.info(f"PID of 'com.android.settings': {pid}")
         logger.info(
             "Clearing app data for 'com.android.settings':"
-            +str(android_util.clear_app_data("com.android.settings"))
+            + str(android_util.clear_app_data("com.android.settings"))
         )
         logger.info(
             "Setting debugger app to 'com.android.settings':"
-            +str(android_util.set_debugger_app("com.android.settings"))
+            + str(android_util.set_debugger_app("com.android.settings"))
         )
         logger.info("Removing debugger app:" + str(android_util.remove_debugger_app()))
         logger.info("Connected Devices:" + str(android_util.get_connected_devices()))
@@ -99,7 +101,7 @@ if __name__ == "__main__":
         # logger.info("Checking permission 'android.permission.ACCESS_FINE_LOCATION': " + str(check_permission(permission='android.permission.ACCESS_FINE_LOCATION', package_name='com.android.launcher3')))
         logger.info(
             "Forcing GC for 'com.android.launcher3': "
-            +str(android_util.force_gc(package_name="com.android.launcher3"))
+            + str(android_util.force_gc(package_name="com.android.launcher3"))
         )
         # logger.info("Killing process 'com.android.launcher3': " + str(kill_process(package_name='com.android.launcher3')))
         # logger.info("Uninstalling 'com.android.launcher3': " + str(uninstall_app(package_name='com.android.launcher3')))
