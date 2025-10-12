@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-FRIDA_SCRIPT_FILE = "export_bitmaps.js"
 ANDROID_SAVE_DIR = "/sdcard/Download/exported_bitmaps/"
 
 def export_bitmaps(package, output_dir=None, frida_script="export_bitmaps.js", device_id=None) -> str:

@@ -46,13 +46,13 @@ class FridaScriptExecutor:
 
     def _initialize_device(self):
         """Gets and initializes the Frida device."""
-        logger.info("Initializing Frida device...")
+        logger.debug("Initializing Frida device...")
         try:
             if self.device_id:
                 self.device = frida.get_device(self.device_id)
             else:
                 self.device = frida.get_usb_device(timeout=5)
-            logger.info(f"Found device: {self.device.name}")
+            logger.debug(f"Found device: {self.device.name}")
         except frida.ServerNotRunningError:
             logger.error("Error: Frida server is not running on the device. Please start it first.", exc_info=True)
             raise
@@ -93,21 +93,21 @@ class FridaScriptExecutor:
 
     def _load_script_legacy(self):
         """Loads script by directly reading the file (for Frida < 17)."""
-        logger.info("Loading and injecting Frida script (legacy mode)...")
+        logger.debug("Loading and injecting Frida script (legacy mode)...")
         try:
             with open(self.frida_script_path, 'r', encoding='utf-8') as f:
                 self.script_content = f.read()
             self.script = self.session.create_script(self.script_content)
             self.script.on('message', self.on_message)
             self.script.load()
-            logger.info("Script injected successfully.")
+            logger.debug("Script injected successfully.")
         except Exception as e:
             logger.error(f"Failed to load or inject script: {e}", exc_info=True)
             raise
 
     def _load_script_with_compiler(self):
         """Loads script using the compiler (for Frida 17+)."""
-        logger.info("Compiling and injecting Frida script (Frida 17+ mode)...")
+        logger.debug("Compiling and injecting Frida script (Frida 17+ mode)...")
         try:
             compiler = frida.Compiler()
             
@@ -121,7 +121,7 @@ class FridaScriptExecutor:
             self.script = self.session.create_script(self.script_content)
             self.script.on('message', self.on_message)
             self.script.load()
-            logger.info("Script injected successfully.")
+            logger.debug("Script injected successfully.")
         except Exception as e:
             error_str = str(e).lower()
             # Check for the specific compilation failure related to module resolution
@@ -202,10 +202,10 @@ class FridaScriptExecutor:
         if not self.device:
             self._initialize_device()
         
-        logger.info(f"Attaching to target: '{target}'...")
+        logger.debug(f"Attaching to target: '{target}'...")
         try:
             self.session = self.device.attach(target)
-            logger.info(f"Attached to process with PID: {target}")
+            logger.debug(f"Attached to process with PID: {target}")
             self._load_script()
         # check frida server is running
         except frida.ServerNotRunningError:
@@ -224,7 +224,7 @@ class FridaScriptExecutor:
         if self.session:
             try:
                 self.session.detach()
-                logger.info("Frida session detached successfully.")
+                logger.debug("Frida session detached successfully.")
             except Exception as e:
                 logger.warning(f"Error during detachment: {e}")
             finally:
@@ -247,7 +247,7 @@ class FridaScriptExecutor:
 
         # 过滤掉 None 参数，防止传递到 JS 端变成 null
         filtered_args = tuple(a for a in args if a is not None)
-        logger.info(f"Calling RPC method '{method_name}' with args: {filtered_args}")
+        logger.debug(f"Calling RPC method '{method_name}' with args: {filtered_args}")
         self.message_event.clear()
         self.result_data = None
         self.error_occurred = False
@@ -269,7 +269,7 @@ class FridaScriptExecutor:
             return None
 
         if wait_for_result:
-            logger.info(f"Waiting for result from '{method_name}'...")
+            logger.debug(f"Waiting for result from '{method_name}'...")
             event_was_set = self.message_event.wait(timeout)
             if self.error_occurred:
                 logger.error("An error occurred in the script during RPC execution.")
@@ -277,7 +277,7 @@ class FridaScriptExecutor:
             if not event_was_set:
                 logger.warning(f"Timed out waiting for result from '{method_name}'.")
                 return None
-            logger.info(f"Received result: {self.result_data}")
+            logger.debug(f"Received result: {self.result_data}")
             return self.result_data
         
         return None

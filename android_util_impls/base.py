@@ -14,7 +14,6 @@ from android_util_impls.environment import (
     get_android_build_tools_path,
 )
 
-
 class AndroidUtilBase:
 
     def __init__(self, device: str = None):
@@ -444,74 +443,6 @@ class AndroidUtilBase:
             raise
         return ""
 
-    def get_resumed_fragment2(self, device="") -> str:
-        """
-        Get the name of the currently focused Fragment.
-
-        Args:
-            device (str): The ID of the device.
-
-        Returns:
-            str: The name of the currently focused Fragment, or an empty string if not found.
-        """
-        adb_cmd = self.get_adb_command(device)
-        if not adb_cmd:
-            return ""
-        try:
-            focused_package = self.get_focused_app_package(device)
-            if not focused_package:
-                return ""
-            command = (
-                f'{adb_cmd} shell "dumpsys activity {focused_package} activities | grep mResumed=true"'
-            )
-            result = run_command(command, shell=True, check_output=True)
-            # Find the part containing "Active Fragments" and extract SoundSettings
-            # mCreated=true mResumed=true mStopped=false    Active Fragments:    SoundSettings{985054f} (287240d6-e623-4d37-859a-3fec6fc3d8f4) id=0x7f0a02b6}
-            for line in result.splitlines():
-                if "Active Fragments" in line:
-                    import re
-
-                    match = re.search(r"Active Fragments:\s+([^\s{]+)", line)
-                    if match:
-                        return match.group(1)
-            return ""
-        except Exception as e:
-            logger.error(
-                f"Error occurred while getting the name of the currently focused Fragment: {e}",
-                e,
-            )
-            raise
-
-    def get_resumed_fragment(self, device="") -> str:
-        """
-        Get the name of the currently resumed Fragment from a local dump file.
-
-        This function find resumed fragments from command "adb shell dumpsys activity activities"
-        """
-        adb_cmd = self.get_adb_command(device)
-        if not adb_cmd:
-            return ""
-        import re
-        try:
-            command = f"{adb_cmd} shell dumpsys activity activities"
-            output = run_command(command, check_output=True, shell=True)
-            # Find all activities with mResumed=true
-            activity_blocks = re.split(r'TASK \d+:', output)[1:]
-            for block in activity_blocks:
-                # Find all fragments in this activity block
-                for frag in re.finditer(r'([A-Za-z0-9_]+Fragment\{[^\}]+\})', block):
-                    frag_block = frag.group(1)
-                    frag_name_match = re.match(r'([A-Za-z0-9_]+Fragment)', frag_block)
-                    frag_name = frag_name_match.group(1) if frag_name_match else None
-                    state_match = re.search(r'mState=(\d+)', block)
-                    state = int(state_match.group(1)) if state_match else None
-                    if state and state >= 5:
-                        return frag_name
-            return ""
-        except Exception as e:
-            logger.error(f"Error occurred while getting resumed fragments: {e}", e)
-            return ""
-
     def find_apk_path(self, keyword: str, device="") -> list:
         """
         Find the APK file paths containing the specified keyword. Each item contains the package name and APK path.
@@ -607,7 +538,7 @@ class AndroidUtilBase:
         adb_command = self.get_adb_command(device)
         if not adb_command:
             return False
-        from activity_manager_service import set_debugger_app
+        from android_util_impls.activity_manager_util import set_debugger_app
 
         return set_debugger_app(adb_command, package_name)
 
@@ -615,7 +546,7 @@ class AndroidUtilBase:
         adb_command = self.get_adb_command(device)
         if not adb_command:
             return False
-        from activity_manager_service import remove_debugger_app
+        from android_util_impls.activity_manager_util import remove_debugger_app
 
         return remove_debugger_app(adb_command)
 
@@ -969,7 +900,7 @@ class AndroidUtilBase:
         adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
             return False
-        from activity_manager_service import kill_process
+        from android_util_impls.activity_manager_util import kill_process
 
         result = kill_process(adb_cmd, package_name)
         if not result:
@@ -1373,7 +1304,7 @@ class AndroidUtilBase:
             return {}
 
         try:
-            from android_util_impls.package_manager_service import get_flags_for_package
+            from android_util_impls.package_manager_util import get_flags_for_package
 
             flags = get_flags_for_package(adb_command, package_name)
             return flags
