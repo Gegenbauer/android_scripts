@@ -51,7 +51,7 @@ class AdbCommand(Command):
         # Check if device is connected
         devices = default_android_util.get_connected_devices()
         if not devices or len(devices) == 0:
-            logger.error("No connected devices detected")
+            logger.debug("No connected devices detected")
             return None
         logger.debug(f"Connected devices: {devices}")
         # Handle multiple device warning

@@ -16,6 +16,8 @@ class AndroidUtilManager:
     def __init__(self):
         # [(impl_class, android_version, brand)]
         self._impls = [(AndroidUtilBase, None, None)]
+        self.default_impl = self._impls[0][0]()
+        self.default_impl.check_adb_state()
 
     def register(self, impl_class, android_version=None, brand=None):
         """
@@ -30,7 +32,7 @@ class AndroidUtilManager:
         device_info: dict, must contain 'android_version', 'brand'
         """
         logger.debug(f"Selecting implementation for device: {device}")
-        default_impl = self._impls[0][0]()
+        default_impl = self.default_impl
         version = default_impl.get_device_sdk_version(device=device)
         brand = default_impl.get_device_brand(device=device)
         for impl, v, b in self._impls:
@@ -67,7 +69,6 @@ if __name__ == "__main__":
         logger.info(f"APK Paths containing 'example':{android_util.find_apk_path('settings')}")
         logger.info(f"Focused Activity:{android_util.get_focused_activity()}")
         logger.info(f"Focused Window:{android_util.get_focused_window()}")
-        logger.info(f"Focused Fragment:{android_util.get_resumed_fragment()}")
         logger.info(
             f"App Version for 'com.android.settings':{android_util.get_app_version('com.android.settings')}"
         )

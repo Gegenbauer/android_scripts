@@ -34,14 +34,14 @@ class AndroidUtilBase:
     def get_adb_path(self, warning: bool = False) -> str:
         return get_adb_path(warning=warning)
 
-    def get_connected_devices(self, warningForAdb: bool = True) -> list:
+    def get_connected_devices(self, warning_for_adb: bool = True) -> list:
         """
         Get the list of connected Android devices.
 
         Returns:
             list: List of connected devices, each as a string in the format 'device_id device_name'.
         """
-        adb_path = self.get_adb_path(warningForAdb)
+        adb_path = self.get_adb_path(warning_for_adb)
         if not adb_path:
             return []
 
@@ -61,26 +61,41 @@ class AndroidUtilBase:
             logger.error(f"Error occurred while getting connected devices: {e}", e)
             raise
         
-    def get_connected_device_id(self, warningForAdb: bool = True) -> str:
+    def get_connected_device_id(self, warning_for_adb: bool = True) -> str:
         """
         Get the ID of the first connected Android device.
 
         Returns:
             str: The ID of the first connected device, or an empty string if no devices are connected.
         """
-        if self.device != None and self.device != "":
+        if self.device is not None and self.device != "":
             return self.device
-        devices = self.get_connected_devices(warningForAdb)
+        devices = self.get_connected_devices(warning_for_adb)
         if devices:
             return devices[0].split()[0]
         return ""
+    
+    def check_adb_state(self, device: str = "", warning_for_adb: bool = True) -> bool:
+        """
+        Check if adb is available and if the specified device is connected.
+
+        Args:
+            device (str): The ID of the device to check. If empty, checks for any connected device.
+            warning_for_adb (bool): Whether to print warnings if adb is not found or no devices are connected.
+        Returns:
+            bool: True if adb is available and the device is connected, False otherwise.
+        """
+        adb_cmd = self.get_adb_command(
+            device, print_adb_warning=warning_for_adb, print_device_warning=warning_for_adb
+        )
+        return bool(adb_cmd)
 
     # Get the available adb command string
     def get_adb_command(
         self,
         device: str,
-        print_adb_warning: bool = True,
-        print_device_warning: bool = True,
+        print_adb_warning: bool = False,
+        print_device_warning: bool = False,
     ) -> str:
         """
         Return a command prefix like '/path/to/adb -s device'.
@@ -99,7 +114,7 @@ class AndroidUtilBase:
                     "adb tool not detected, please check environment variables and SDK configuration."
                 )
             return ""
-        devices = self.get_connected_devices(warningForAdb=False)
+        devices = self.get_connected_devices(warning_for_adb=False)
         device_ids = [d.split()[0] for d in devices if d.strip()]
         if not device_ids:
             if print_device_warning:
@@ -289,9 +304,7 @@ class AndroidUtilBase:
         Returns:
             str: The SDK version of the device, or an empty string if not found.
         """
-        adb_cmd = self.get_adb_command(
-            device, print_adb_warning=True, print_device_warning=True
-        )
+        adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
             return ""
         try:
@@ -314,9 +327,7 @@ class AndroidUtilBase:
         Returns:
             str: The brand information of the device, or an empty string if not found.
         """
-        adb_cmd = self.get_adb_command(
-            device, print_adb_warning=True, print_device_warning=True
-        )
+        adb_cmd = self.get_adb_command(device)
         if not adb_cmd:
             return ""
         try:
@@ -367,7 +378,6 @@ class AndroidUtilBase:
                 e,
             )
             raise
-        return ""
 
     def get_focused_activity(self, device="") -> str:
         """
@@ -441,7 +451,6 @@ class AndroidUtilBase:
                 e,
             )
             raise
-        return ""
 
     def find_apk_path(self, keyword: str, device="") -> list:
         """
@@ -472,7 +481,6 @@ class AndroidUtilBase:
         except Exception as e:
             logger.error(f"Error occurred while finding APK paths: {e}", e)
             raise
-        return []
 
     def get_app_version(self, package_name: str, device: str = "") -> str:
         """
@@ -602,7 +610,7 @@ class AndroidUtilBase:
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
-            return False
+            return ""
 
         try:
             command = f'{adb_command} shell "dumpsys package {package_name} | grep versionCode"'
@@ -634,7 +642,7 @@ class AndroidUtilBase:
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
-                return False
+                return ""
             result = run_command(
                 f"{adb_command} shell getprop persist.sys.timezone",
                 check_output=True,
@@ -642,8 +650,8 @@ class AndroidUtilBase:
             )
             tz_name = result.strip()
             if not tz_name:
-                logger.error("Error: Failed to get timezone name from device.", e)
-                return None
+                logger.error("Error: Failed to get timezone name from device.")
+                return ""
             return tz_name
         except Exception as e:
             logger.error(f"Error: Failed to get device timezone: {e}", e)
@@ -655,6 +663,7 @@ class AndroidUtilBase:
         """
         Let the device use its own timezone database to convert local time to UTC milliseconds.
         """
+        utc_seconds_str = ""
         try:
             adb_command = self.get_adb_command(device)
             if not adb_command:
@@ -839,8 +848,9 @@ class AndroidUtilBase:
         Grant the specified permission to the device.
 
         Args:
-            device (str): The ID of the device.
             permission (str): The permission to grant.
+            package_name (str): The package name of the application to grant the permission to.
+            device (str): The ID of the device.
 
         Returns:
             bool: Whether the permission was successfully granted.
@@ -1106,7 +1116,7 @@ class AndroidUtilBase:
         """
         adb_command = self.get_adb_command(device)
         if not adb_command:
-            return {}
+            return []
 
         try:
             command = f"{adb_command} shell dumpsys package permissions"
@@ -1126,7 +1136,7 @@ class AndroidUtilBase:
                 # Use regular expressions to extract the permission name
                 import re
 
-                match = re.match(r"Permission \[(.+?)\]", key)
+                match = re.match(r"Permission \[(.+?)]", key)
                 if match:
                     permission_name = match.group(1)
                     source_package = value.get("sourcePackage", "")
@@ -1137,7 +1147,7 @@ class AndroidUtilBase:
                     package_permissions.append(
                         PermissionInfo(
                             name=permission_name,
-                            sourcePackage=source_package,
+                            source_package=source_package,
                             prot=prot,
                         )
                     )
@@ -1212,13 +1222,13 @@ class AndroidUtilBase:
             )
             return False
 
-    def create_directory(self, remote_path: str, accessMode: str, device="") -> bool:
+    def create_directory(self, remote_path: str, access_mode: str, device="") -> bool:
         """
         Create a directory on the device.
         Args:
             device (str): The ID of the device.
             remote_path (str): The remote path of the directory to create.
-            accessMode (str): The access mode of the directory, e.g. "755".
+            access_mode (str): The access mode of the directory, e.g. "755".
         Returns:
             bool: Whether the directory was successfully created.
         """
@@ -1230,7 +1240,7 @@ class AndroidUtilBase:
             command = f"{adb_cmd} shell mkdir -p {remote_path}"
             run_command(command, shell=True)
             # Set the access mode
-            command = f"{adb_cmd} shell chmod {accessMode} {remote_path}"
+            command = f"{adb_cmd} shell chmod {access_mode} {remote_path}"
             run_command(command, shell=True)
             return True
         except Exception as e:
@@ -1240,13 +1250,13 @@ class AndroidUtilBase:
             )
             return False
 
-    def change_access_mode(self, remote_path: str, accessMode: str, device="") -> bool:
+    def change_access_mode(self, remote_path: str, access_mode: str, device="") -> bool:
         """
         Change the access mode of a file or directory on the device.
         Args:
             device (str): The ID of the device.
             remote_path (str): The remote path of the file or directory.
-            accessMode (str): The access mode to set, e.g. "755".
+            access_mode (str): The access mode to set, e.g. "755".
         Returns:
             bool: Whether the access mode was successfully changed.
         """
@@ -1254,7 +1264,7 @@ class AndroidUtilBase:
         if not adb_cmd:
             return False
         try:
-            command = f"{adb_cmd} shell chmod {accessMode} {remote_path}"
+            command = f"{adb_cmd} shell chmod {access_mode} {remote_path}"
             run_command(command, shell=True)
             return True
         except Exception as e:
@@ -1315,8 +1325,6 @@ class AndroidUtilBase:
             )
             raise
 
-        return {}
-
     def get_apk_path(self, package_name: str, device="") -> str:
         """
         Get the APK file path of the specified application on the device.
@@ -1350,15 +1358,12 @@ class AndroidUtilBase:
                 e,
             )
             raise
-
-        return ""
-
-
+    
 class PermissionInfo:
 
-    def __init__(self, name="", sourcePackage="", prot=""):
+    def __init__(self, name="", source_package="", prot=""):
         self.name = name
-        self.sourcePackage = sourcePackage
+        self.sourcePackage = source_package
         self.prot = prot
 
     def __repr__(self):
@@ -1367,8 +1372,8 @@ class PermissionInfo:
 
 class PackagePermissionInfo:
 
-    def __init__(self, packageName=""):
-        self.packageName = packageName
+    def __init__(self, package_name=""):
+        self.packageName = package_name
         self.requestedPermissions = []  # List of permission names
         self.grantedPermissions = []  # List of permission names
         self.deniedPermissions = []  # List of permission names

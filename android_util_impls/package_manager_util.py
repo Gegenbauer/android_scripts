@@ -14,10 +14,10 @@ def get_flags_for_package(adb_command: str, package_name: str) -> dict:
     if not adb_command:
         return {}
 
+    import subprocess
+    from script_base.utils import run_command
+    from script_base.log import logger
     try:
-        import subprocess
-        from script_base.utils import run_command
-        from script_base.log import logger
 
         command = f"{adb_command} shell dumpsys package {package_name}"
         output = run_command(command, shell=True)
@@ -52,8 +52,6 @@ def get_flags_for_package(adb_command: str, package_name: str) -> dict:
         )
         raise
 
-    return {}
-
 
 def is_platform_app(adb_command: str, package_name: str) -> bool:
     """
@@ -83,7 +81,7 @@ def is_platform_app(adb_command: str, package_name: str) -> bool:
         logger.error(
             "Note: The device has binary XML parsing enabled (persist.sys.binary_xml=true). packages.xml may be in binary XML format."
         )
-        return None
+        return False
     output = run_command(
         f"{adb_command} shell \"cat /data/system/packages.xml|grep {package_name}\"", check_output=True, shell=True
     )

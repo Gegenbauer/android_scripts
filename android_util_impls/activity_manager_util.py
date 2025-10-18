@@ -5,7 +5,6 @@ def set_debugger_app(adb_command: str, package_name: str) -> bool:
     Args:
         adb_command (str): The adb command to use.
         package_name (str): The package name of the application to set as the debugger application.
-        device (str): The ID of the device (optional).
 
     Returns:
         bool: Whether the application was successfully set as the debugger application.
@@ -13,10 +12,10 @@ def set_debugger_app(adb_command: str, package_name: str) -> bool:
     if not adb_command:
         return False
 
+    import subprocess
+    from script_base.utils import run_command
+    from script_base.log import logger
     try:
-        import subprocess
-        from script_base.utils import run_command
-        from script_base.log import logger
 
         command = f"{adb_command} shell am set-debug-app -w {package_name}"
         run_command(command, shell=True)
@@ -27,8 +26,6 @@ def set_debugger_app(adb_command: str, package_name: str) -> bool:
             e,
         )
         raise
-
-    return False
 
 
 def remove_debugger_app(adb_command: str) -> bool:
@@ -44,10 +41,10 @@ def remove_debugger_app(adb_command: str) -> bool:
     if not adb_command:
         return False
 
+    import subprocess
+    from script_base.utils import run_command
+    from script_base.log import logger
     try:
-        import subprocess
-        from script_base.utils import run_command
-        from script_base.log import logger
 
         command = f"{adb_command} shell am clear-debug-app"
         run_command(command, ignore_command_error=True, shell=True)
@@ -56,14 +53,12 @@ def remove_debugger_app(adb_command: str) -> bool:
         logger.error(f"Error occurred while removing the debugger application: {e}", e)
         raise
 
-    return False
-
 def kill_process(adb_command: str, package_name: str) -> bool:
     """
     Kill the specified process on the device.
 
     Args:
-        device (str): The ID of the device.
+        adb_command (str): The adb command to use.
         package_name (str): The package name of the process to kill.
 
     Returns:

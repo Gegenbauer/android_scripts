@@ -7,13 +7,11 @@ from command.android.apk import PullApkCommand, DecompileCommand
 from command.android.base import AdbCommand
 from command.android.file import ViewFolderCommand, ViewFileCommand
 from command.android.package_manager import PackageManagerCommand
-from command.android.performance import ExportBitmapsCommand, DumpMemoryCommand
+from command.android.performance import ExportBitmapsCommand, DumpMemoryCommand, DumpThreadStackCommand
 from command.android.setting import SetTimeCommand, SetUiModeCommand, SetLanguageCommand
 from script_base.log import logger
 from script_base.script_manager import ScriptManager
-from script_base.utils import (
-    run_command,
-)
+from script_base.utils import run_command
 
 class ShowFocusedActivityCommand(AdbCommand):
     """
@@ -214,7 +212,7 @@ if __name__ == "__main__":
 Includes comprehensive subcommands for Android device operations:
 - Device management: set-time, show-focused-activity, set-ui-mode
 - File operations: view-folder, view-file (pull and view device files)
-- App management: kill, clear-data, dump-memory, debugger, package-manager
+- App management: kill, clear-data, dump-memory, debugger, package-manager, dump-thread-stack
 - APK operations: pull-apk (extract APK from device), decompile (decompile APK/JAR)
 - Advanced features: export-bitmaps, set-language (using Frida)
 
@@ -236,6 +234,7 @@ Usage examples:
   python adb.py set-language --language zh --country CN
   python adb.py debugger set --focused
   python adb.py package-manager flags --focused
+  python adb.py dump-thread-stack --focused --open-vscode
 """
     )
 
@@ -306,6 +305,11 @@ Usage examples:
         "decompile",
         DecompileCommand(),
         help_text="Decompile APK or JAR files using apktool, with support for pulling from device."
+    )
+    manager.register_command(
+        "dump-thread-stack",
+        DumpThreadStackCommand(),
+        help_text="Dump thread stack traces of a target Android app process."
     )
 
     manager.run()

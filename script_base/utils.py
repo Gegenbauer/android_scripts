@@ -102,10 +102,10 @@ def open_in_file_manager(path: str):
         run_command(["open", path], check_output=False)
     else:
         import shutil
-        if shutil.which("nautilus"):
-            run_command(["nautilus", path], check_output=False)
-        elif shutil.which("thunar"):
+        if shutil.which("thunar"):
             run_command(["thunar", path], check_output=False)
+        elif shutil.which("nautilus"):
+            run_command(["nautilus", path], check_output=False)
         elif shutil.which("dolphin"):
             run_command(["dolphin", path], check_output=False)
         elif shutil.which("pcmanfm"):

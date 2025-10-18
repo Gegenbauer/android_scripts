@@ -145,7 +145,6 @@ class DecompileCommand(AdbCommand):
 
     def execute_on_device(self, args, android_util):
         # Determine source file
-        source_file = None
 
         if args.local_file:
             source_file = args.local_file

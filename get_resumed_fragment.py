@@ -9,7 +9,7 @@ def get_resumed_fragment(package_name, frida_script="get_resumed_fragment.js", d
     """Get all currently resumed fragments in an Android application.
     
     Args:
-        package: Android package name to inspect
+        package_name: Android package name to inspect
         frida_script: Frida JavaScript file name (default: get_resumed_fragment.js)
         device_id: Optional Android device ID for multi-device scenarios
     
