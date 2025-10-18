@@ -19,7 +19,7 @@ class AndroidUtilManager:
         self.default_impl = self._impls[0][0]()
         self.default_impl.check_adb_state()
 
-    def register(self, impl_class, android_version=None, brand=None):
+    def register(self, impl_class: AndroidUtilBase, android_version: str = None, brand: str = None):
         """
         Register an implementation class, optionally specifying the applicable android_version and brand name.
         """

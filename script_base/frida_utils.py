@@ -22,7 +22,7 @@ class FridaScriptExecutor:
     A base class for executing Frida scripts and communicating with them.
     Encapsulates the common logic for device discovery, process attachment, script loading, RPC calls, and message handling.
     """
-    def __init__(self, frida_script_path, device_id=None):
+    def __init__(self, frida_script_path: str, device_id: str = None):
         """
         Initializes the FridaScriptExecutor.
 

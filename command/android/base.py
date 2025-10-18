@@ -1,4 +1,5 @@
 # ===== Base Command for ADB Operations =====
+from android_util_impls.base import AndroidUtilBase
 from android_util_impls.manager import android_util_manager
 from script_base.log import logger
 from script_base.script_manager import Command
@@ -66,7 +67,7 @@ class AdbCommand(Command):
             device_serial = devices[0].split()[0]
         return android_util_manager.select(device=device_serial)
 
-    def execute_on_device(self, args, android_util):
+    def execute_on_device(self, args, android_util: AndroidUtilBase):
         """Override this method to implement command-specific logic.
 
         Args:

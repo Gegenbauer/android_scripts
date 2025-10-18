@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Comprehensive adb utility script, integrating set_time, show_focused_activity, and android_file_viewer features.
+ADB multi-tool script.
+Provides various commands for Android device operations via ADB.
+Includes device management, file operations, app management, performance tracing, APK operations, and advanced features.
 """
 
 from command.android.apk import PullApkCommand, DecompileCommand
 from command.android.base import AdbCommand
 from command.android.file import ViewFolderCommand, ViewFileCommand
 from command.android.package_manager import PackageManagerCommand
-from command.android.performance import ExportBitmapsCommand, DumpMemoryCommand, DumpThreadStackCommand
+from command.android.performance import RecordSystemTraceCommand, ExportBitmapsCommand, DumpMemoryCommand, DumpThreadStackCommand
 from command.android.setting import SetTimeCommand, SetUiModeCommand, SetLanguageCommand
 from script_base.log import logger
 from script_base.script_manager import ScriptManager
@@ -213,6 +215,7 @@ Includes comprehensive subcommands for Android device operations:
 - Device management: set-time, show-focused-activity, set-ui-mode
 - File operations: view-folder, view-file (pull and view device files)
 - App management: kill, clear-data, dump-memory, debugger, package-manager, dump-thread-stack
+- Performance tracing: record-systrace
 - APK operations: pull-apk (extract APK from device), decompile (decompile APK/JAR)
 - Advanced features: export-bitmaps, set-language (using Frida)
 
@@ -235,6 +238,7 @@ Usage examples:
   python adb.py debugger set --focused
   python adb.py package-manager flags --focused
   python adb.py dump-thread-stack --focused --open-vscode
+  python adb.py record-systrace --duration 10
 """
     )
 
@@ -310,6 +314,11 @@ Usage examples:
         "dump-thread-stack",
         DumpThreadStackCommand(),
         help_text="Dump thread stack traces of a target Android app process."
+    )
+    manager.register_command(
+        "record-systrace",
+        RecordSystemTraceCommand(),
+        help_text="Record a systrace on the Android device."
     )
 
     manager.run()

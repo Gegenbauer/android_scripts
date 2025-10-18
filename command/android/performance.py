@@ -1,4 +1,5 @@
 import os
+import re
 
 from command.android.base import AdbCommand
 from export_bitmaps import export_bitmaps
@@ -270,3 +271,197 @@ class DumpThreadStackCommand(AdbCommand):
         except Exception as e:
             logger.error(f"Failed to dump thread stack for {package_name}: {e}")
             return
+        
+
+class RecordSystemTraceCommand(AdbCommand):
+    """
+    Capture Android system traces using Perfetto's record_android_trace tool.
+    
+    This command downloads the official record_android_trace script if needed,
+    captures system traces for a specified duration, and provides options to
+    view the results in browser or file manager.
+    """
+
+    def add_custom_arguments(self, parser):
+        parser.add_argument(
+            "-t", "--duration", 
+            type=int, 
+            default=20,
+            help="Trace duration in seconds (default: 20)"
+        )
+        parser.add_argument(
+            "--config",
+            default="config/config.pbtx",
+            help="Path to perfetto config file (default: config/config.pbtx)"
+        )
+        parser.add_argument(
+            "--cache-dir",
+            default=os.environ.get("cache_files_dir", "."),
+            help="Local cache directory"
+        )
+        parser.add_argument(
+            "--tag",
+            type=str,
+            help="Tag to prefix the output trace filename"
+        )
+        
+        # Output options (mutually exclusive)
+        output_group = parser.add_mutually_exclusive_group()
+        output_group.add_argument(
+            "--no-open-browser",
+            action="store_true",
+            help="Do not open trace in browser after capture"
+        )
+        output_group.add_argument(
+            "--file-manager-only",
+            action="store_true", 
+            help="Only show trace file in file manager (implies --no-open-browser)"
+        )
+        output_group.add_argument(
+            "--path-only",
+            action="store_true",
+            help="Only output the trace file path (implies --no-open-browser)"
+        )
+
+    def execute_on_device(self, args, android_util):
+        try:
+            # Setup directories and paths
+            import os
+            work_dir = os.path.join(args.cache_dir, "systraces")
+            ensure_directory_exists(work_dir)
+            
+            record_script_path = os.path.join(work_dir, "record_android_trace")
+            config_path = os.path.join(os.path.dirname(__file__), "..", "..", args.config)
+            
+            # Check if config file exists
+            if not os.path.exists(config_path):
+                logger.error(f"Config file not found: {config_path}")
+                return
+            
+            # Download record_android_trace if not exists
+            if not os.path.exists(record_script_path):
+                logger.info("Downloading record_android_trace script...")
+                self._download_record_script(record_script_path)
+            
+            # Generate output filename with timestamp and optional tag
+            ts = timestamp()
+            tag_part = ""
+            if args.tag:
+                sanitized_tag = re.sub(r"[^a-zA-Z0-9_-]+", "_", args.tag.strip())
+                if sanitized_tag:
+                    tag_part = f"{sanitized_tag}_"
+                else:
+                    logger.warning("Tag provided but empty after sanitization; skipping tag in filename")
+            output_filename = f"systrace_{tag_part}{ts}.perfetto-trace"
+            output_path = os.path.join(work_dir, output_filename)
+            
+            # Prepare command
+            cmd = [
+                record_script_path,
+                "--serial", android_util.get_connected_device_id(),
+                "-c", config_path,
+                "-o", output_path,
+                "-t", f"{args.duration}s"
+            ]
+            
+            # Add --no-open flag if user doesn't want browser
+            if args.no_open_browser or args.file_manager_only or args.path_only:
+                cmd.append("--no-open-browser")
+            
+            logger.info(f"Starting system trace capture for {args.duration} seconds...")
+            logger.info("Press Ctrl+C to stop capture early")
+            
+            # Execute trace capture with proper signal handling
+            capture_interrupted = False
+            try:
+                import subprocess
+                import signal
+                import os
+                
+                # Create process without showing output by default
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,  # Suppress record_android_trace output
+                    stderr=subprocess.DEVNULL,  # Suppress error output
+                    cwd=work_dir,
+                    preexec_fn=os.setsid  # Create new process group
+                )
+                
+                def signal_handler(sig, frame):
+                    nonlocal capture_interrupted
+                    capture_interrupted = True
+                    logger.info("Stopping trace capture...")
+                    try:
+                        # Send SIGTERM to the process group
+                        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass  # Process already terminated
+                
+                # Set up signal handler for Ctrl+C
+                original_sigint_handler = signal.signal(signal.SIGINT, signal_handler)
+                
+                # Wait for process to complete
+                return_code = process.wait()
+                
+                # Restore original signal handler
+                signal.signal(signal.SIGINT, original_sigint_handler)
+                
+                if return_code != 0 and not capture_interrupted:
+                    logger.error(f"Trace capture failed with return code {return_code}")
+                    return
+                    
+            except Exception as e:
+                logger.error(f"Error during trace capture: {e}")
+                return
+            
+            # Check if trace file was created
+            if not os.path.exists(output_path):
+                if capture_interrupted:
+                    logger.warning("Trace capture was interrupted, partial trace file may not be available")
+                else:
+                    logger.error(f"Trace file was not created: {output_path}")
+                return
+            
+            file_size = os.path.getsize(output_path)
+            if capture_interrupted:
+                logger.info(f"Trace capture stopped by user")
+            else:
+                logger.info(f"Trace capture completed successfully")
+            
+            logger.info(f"Output file: {output_path} ({file_size / 1024 / 1024:.1f} MB)")
+            
+            # Handle output options for cases where browser wasn't opened
+            if args.file_manager_only:
+                self._open_in_file_manager(output_path)
+            elif not args.no_open_browser:
+                # Browser was opened automatically by record_android_trace
+                logger.info("Trace opened in browser automatically")
+                
+        except Exception as e:
+            logger.error(f"Failed to capture system trace", e)
+
+    def _download_record_script(self, script_path):
+        """Download the official record_android_trace script from Google."""
+        import urllib.request
+        
+        url = "https://raw.githubusercontent.com/google/perfetto/master/tools/record_android_trace"
+        
+        try:
+            logger.info(f"Downloading from: {url}")
+            urllib.request.urlretrieve(url, script_path)
+            
+            # Make script executable
+            import stat
+            st = os.stat(script_path)
+            os.chmod(script_path, st.st_mode | stat.S_IEXEC)
+            
+            logger.info(f"Downloaded and made executable: {script_path}")
+            
+        except Exception as e:
+            logger.error(f"Failed to download record_android_trace: {e}")
+            raise
+
+    def _open_in_file_manager(self, file_path):
+        """Open the trace file location in file manager."""
+        import script_base.utils as utils
+        utils.open_in_file_manager(file_path)
