@@ -39,14 +39,14 @@ Usage examples:
   python adb.py dump-memory --focused --convert-mat
   python adb.py kill --focused
   python adb.py clear-data --focused --type cache shared_prefs
-  python adb.py pull-apk --focused --show-in-manager
+  python adb.py pull-apk --focused --show-in-file-manager
   python adb.py decompile --package com.example.app
   python adb.py decompile --local-file /path/to/app.apk --no-open
   python adb.py export-bitmaps --package com.example.app
   python adb.py set-language --language zh --country CN
   python adb.py debugger set --focused
   python adb.py package-manager flags --focused
-  python adb.py dump-thread-stack --focused --open-vscode
+  python adb.py dump-thread-stack --focused --open-in-vscode
   python adb.py record-systrace --duration 10
 """
     )

@@ -2,13 +2,12 @@ import os
 
 from command.android.base import AdbCommand
 from script_base.utils import (
-    cache_root_arg_to_path,
     open_in_file_manager,
-    open_in_vscode,
     run_command,
     ensure_directory_exists,
     timestamp, sanitize_for_fs,
 )
+from script_base.platforms import current_platform
 from script_base.log import logger
 
 
@@ -16,6 +15,7 @@ class ViewFolderCommand(AdbCommand):
     """Pull a specified directory from the device to a local cache directory and open it in the file manager."""
 
     def add_custom_arguments(self, parser):
+        from script_base.env_setup import env, PathType
         parser.add_argument(
             "--device-path",
             "-p",
@@ -26,6 +26,7 @@ class ViewFolderCommand(AdbCommand):
         parser.add_argument(
             "--cache-root",
             type=str,
+            default=env.get(PathType.CACHE),
             help="Local cache root directory (defaults to environment variable cache_files_dir or current directory)",
         )
         parser.add_argument(
@@ -42,7 +43,7 @@ class ViewFolderCommand(AdbCommand):
         if not device_path:
             logger.error("Error: --device-path must be provided.")
             return
-        cache_root = cache_root_arg_to_path(args.cache_root)
+        cache_root = args.cache_root
         ensure_directory_exists(cache_root)
         tag = args.tag if args.tag else f"{sanitize_for_fs(device_path)}_{timestamp()}"
         local_base_dir = os.path.join(cache_root, "android_viewer", tag)
@@ -78,6 +79,7 @@ class ViewFileCommand(AdbCommand):
     """Pull a specified file from the device to a local cache directory, with support for outputting to the terminal or opening in VSCode."""
 
     def add_custom_arguments(self, parser):
+        from script_base.env_setup import env, PathType
         parser.add_argument(
             "--device-path",
             "-p",
@@ -88,6 +90,7 @@ class ViewFileCommand(AdbCommand):
         parser.add_argument(
             "--cache-root",
             type=str,
+            default=env.get(PathType.CACHE),
             help="Local cache root directory (defaults to environment variable cache_files_dir or current directory)",
         )
         group = parser.add_mutually_exclusive_group()
@@ -98,7 +101,7 @@ class ViewFileCommand(AdbCommand):
             "--open-in-vscode", action="store_true", help="Open the file in VSCode after pulling"
         )
         group.add_argument(
-            "--open-in-manager",
+            "--open-in-file-manager",
             action="store_true",
             help="Show the file in the file manager after pulling",
         )
@@ -114,7 +117,7 @@ class ViewFileCommand(AdbCommand):
         if not device_path:
             logger.error("Error: --device-path must be provided.")
             return
-        cache_root = cache_root_arg_to_path(args.cache_root)
+        cache_root = args.cache_root
         ensure_directory_exists(cache_root)
         tag = f"{sanitize_for_fs(device_path)}_{timestamp()}"
         local_dir = os.path.join(cache_root, "android_viewer", tag)
@@ -172,8 +175,8 @@ class ViewFileCommand(AdbCommand):
             except Exception as e:
                 logger.error(f"Failed to read file: {e}", e)
         elif args.open_in_vscode:
-            open_in_vscode(local_file)
-        elif args.open_in_manager:
+            current_platform.open_in_vscode(local_file)
+        elif args.open_in_file_manager:
             open_in_file_manager(local_file)
         else:
             logger.info(

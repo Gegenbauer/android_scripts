@@ -2,13 +2,12 @@ import os
 
 from command.android.base import AdbCommand
 from script_base.utils import (
-    cache_root_arg_to_path,
     open_in_file_manager,
-    open_in_vscode,
     run_command,
     ensure_directory_exists,
     timestamp,
 )
+from script_base.platforms import current_platform
 from script_base.log import logger
 
 
@@ -18,6 +17,7 @@ class PullApkCommand(AdbCommand):
     """
 
     def add_custom_arguments(self, parser):
+        from script_base.env_setup import env, PathType
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument("-p", "--package", help="Package name of the application to pull APK for.")
         group.add_argument(
@@ -29,10 +29,11 @@ class PullApkCommand(AdbCommand):
         parser.add_argument(
             "--output-dir",
             type=str,
+            default=env.get(PathType.CACHE) + "/pulled_apks",
             help="Local output directory. Defaults to cache_files_dir/pulled_apks/",
         )
         parser.add_argument(
-            "--show-in-manager",
+            "--show-in-file-manager",
             action="store_true",
             help="Show the pulled APK in file manager after download.",
         )
@@ -65,14 +66,9 @@ class PullApkCommand(AdbCommand):
         except Exception as e:
             logger.error(f"Failed to get APK path for {package_name}: {e}", exc=e)
             return
-
-        # Setup output directory
-        if args.output_dir:
-            output_dir = args.output_dir
-        else:
-            cache_root = cache_root_arg_to_path(None)
-            output_dir = os.path.join(cache_root, "pulled_apks")
-
+        
+        output_dir = args.output_dir
+        
         ensure_directory_exists(output_dir)
 
         # Generate local APK filename
@@ -96,7 +92,7 @@ class PullApkCommand(AdbCommand):
         # Verify file exists and show in manager if requested
         if os.path.exists(local_apk_path):
             logger.info(f"APK saved: {local_apk_path}")
-            if args.show_in_manager:
+            if args.show_in_file_manager:
                 open_in_file_manager(local_apk_path)
         else:
             logger.error("APK file was not created successfully.")
@@ -109,6 +105,7 @@ class DecompileCommand(AdbCommand):
 
     def add_custom_arguments(self, parser):
         # Source selection - mutually exclusive
+        from script_base.env_setup import env, PathType
         source_group = parser.add_mutually_exclusive_group(required=True)
         source_group.add_argument(
             "--local-file",
@@ -130,6 +127,7 @@ class DecompileCommand(AdbCommand):
         parser.add_argument(
             "--output-dir",
             type=str,
+            default=env.get(PathType.CACHE) + "/decompiled",
             help="Output directory for decompiled files. Defaults to cache_files_dir/decompiled/",
         )
         parser.add_argument(
@@ -170,7 +168,7 @@ class DecompileCommand(AdbCommand):
                 return
 
             # Pull APK from device
-            source_file = self._pull_apk_from_device(package_name, android_util)
+            source_file = self._pull_apk_from_device(package_name, android_util, args.output_dir)
             if not source_file:
                 return
 
@@ -183,27 +181,22 @@ class DecompileCommand(AdbCommand):
         logger.info(f"Detected file type: {file_type}")
 
         # Setup output directory
-        if args.output_dir:
-            base_output_dir = args.output_dir
-        else:
-            cache_root = cache_root_arg_to_path(None)
-            base_output_dir = os.path.join(cache_root, "decompiled")
-
+        base_output_dir = args.output_dir
         ensure_directory_exists(base_output_dir)
 
         # Create unique output directory
         base_name = os.path.splitext(os.path.basename(source_file))[0]
         ts = timestamp()
-        output_dir = os.path.join(base_output_dir, f"{base_name}_{ts}")
-        ensure_directory_exists(output_dir)
+        real_output_dir = os.path.join(base_output_dir, f"{base_name}_{ts}")
+        ensure_directory_exists(real_output_dir)
 
         # Copy source file to output directory (temporary)
-        temp_source = os.path.join(output_dir, os.path.basename(source_file))
+        temp_source = os.path.join(real_output_dir, os.path.basename(source_file))
         import shutil
         shutil.copy2(source_file, temp_source)
 
         # Decompile using apktool
-        decompiled_dir = os.path.join(output_dir, base_name)
+        decompiled_dir = os.path.join(real_output_dir, base_name)
         success = self._decompile_with_apktool(temp_source, decompiled_dir, args.apktool_jar)
 
         if success:
@@ -218,11 +211,11 @@ class DecompileCommand(AdbCommand):
             # Open in VSCode if requested
             if not args.no_open:
                 logger.info("Opening decompiled directory in VSCode...")
-                open_in_vscode(decompiled_dir)
+                current_platform.open_in_vscode(decompiled_dir)
         else:
             logger.error("Decompilation failed.")
 
-    def _pull_apk_from_device(self, package_name, android_util):
+    def _pull_apk_from_device(self, package_name, android_util, cache_path: str):
         """Pull APK from device and return local path."""
         try:
             apk_path = android_util.get_apk_path(package_name)
@@ -231,8 +224,7 @@ class DecompileCommand(AdbCommand):
                 return None
 
             # Create temporary directory for pulled APK
-            cache_root = cache_root_arg_to_path(None)
-            temp_dir = os.path.join(cache_root, "temp_apks")
+            temp_dir = os.path.join(cache_path, "temp_apks")
             ensure_directory_exists(temp_dir)
 
             ts = timestamp()

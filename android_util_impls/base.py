@@ -1,3 +1,4 @@
+from enum import Enum
 import subprocess
 import os
 import sys
@@ -13,6 +14,12 @@ from android_util_impls.environment import (
     get_adb_path,
     get_android_build_tools_path,
 )
+
+class RemotePathType(Enum):
+    FILE = 1
+    DIRECTORY = 2
+    LINK = 3
+    OTHER = 4
 
 class AndroidUtilBase:
 
@@ -988,21 +995,7 @@ class AndroidUtilBase:
         Returns:
             bool: Whether the remote path is a file.
         """
-        adb_cmd = self.get_adb_command(device)
-        if not adb_cmd:
-            return False
-        try:
-            command = (
-                f"{adb_cmd} shell [ -f {remote_path} ] && echo 'true' || echo 'false'"
-            )
-            result = run_command(command, check_output=True, shell=True)
-            return result.strip() == "true"
-        except Exception as e:
-            logger.error(
-                f"Error occurred while checking if the path {remote_path} on device {device} is a file: {e}",
-                e,
-            )
-            return False
+        return self.get_remote_path_type(remote_path, device) == RemotePathType.FILE
 
     def is_remote_path_directory(self, remote_path: str, device: str = "") -> bool:
         """
@@ -1015,21 +1008,7 @@ class AndroidUtilBase:
         Returns:
             bool: Whether the remote path is a directory.
         """
-        adb_cmd = self.get_adb_command(device)
-        if not adb_cmd:
-            return False
-        try:
-            command = (
-                f"{adb_cmd} shell [ -d {remote_path} ] && echo 'true' || echo 'false'"
-            )
-            result = run_command(command, check_output=True, shell=True)
-            return result.strip() == "true"
-        except Exception as e:
-            logger.error(
-                f"Error occurred while checking if the path {remote_path} on device {device} is a directory: {e}",
-                e,
-            )
-            return False
+        return self.get_remote_path_type(remote_path, device) == RemotePathType.DIRECTORY
 
     def parse_dumpsys_output(self, text: str) -> dict:
         """
@@ -1324,6 +1303,38 @@ class AndroidUtilBase:
                 e,
             )
             raise
+        
+    def get_remote_path_type(self, remote_path: str, device="") -> RemotePathType:
+        """
+        Get the type of the specified remote path on the device.
+
+        Args:
+            remote_path (str): The remote path to check.
+            device (str): The ID of the device (optional).
+
+        Returns:
+            RemotePathType: The type of the remote path (FILE, DIRECTORY, LINK, OTHER).
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return self.RemotePathType.OTHER
+        try:
+            command = f"{adb_cmd} shell stat -c %F {remote_path}"
+            result = run_command(command, check_output=True, shell=True).strip().lower()
+            if "regular file" in result:
+                return self.RemotePathType.FILE
+            elif "directory" in result:
+                return self.RemotePathType.DIRECTORY
+            elif "symbolic link" in result:
+                return self.RemotePathType.LINK
+            else:
+                return self.RemotePathType.OTHER
+        except Exception as e:
+            logger.error(
+                f"Error occurred while getting the type of path {remote_path} on device {device}: {e}",
+                e,
+            )
+            return self.RemotePathType.OTHER
 
     def get_apk_path(self, package_name: str, device="") -> str:
         """

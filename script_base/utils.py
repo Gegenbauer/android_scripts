@@ -2,7 +2,7 @@ import datetime
 import os
 import platform
 import subprocess
-from typing import Optional
+from typing import Optional, Union
 
 from script_base.log import logger
 
@@ -29,7 +29,7 @@ def ensure_directory_exists(path: str):
         logger.debug(f"creating dir: {path}")
 
 
-def run_command(command: list|str, cwd: str=None, check_output: bool=True, shell: bool=False, text: bool=True, ignore_command_error: bool=False) -> str:
+def run_command(command: Union[list, str], cwd: str=None, check_output: bool=True, shell: bool=False, text: bool=True, ignore_command_error: bool=False) -> str:
     """
     Run a shell command and return its standard output.
     
@@ -114,21 +114,7 @@ def open_in_file_manager(path: str):
             run_command(["xdg-open", path], check_output=False)
 
 
-def open_in_vscode(file_path: str, line: Optional[int]=None):
-    target = file_path if line is None else f"{file_path}:{line}"
-    try:
-        run_command(["code", "-g", target], check_output=False)
-    except Exception as e:
-        logger.error(f"failed to open file in VSCode: {e}", e)
-        raise
-
-
 from typing import Optional
-
-
-def cache_root_arg_to_path(cache_root_arg: Optional[str]) -> str:
-    base = cache_root_arg if cache_root_arg else os.environ.get("cache_files_dir", ".")
-    return os.path.abspath(base)
 
 
 def sanitize_for_fs(path: str) -> str:

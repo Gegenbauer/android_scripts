@@ -82,8 +82,8 @@ class Logger:
         return self._simple
 
 # Create a global logger instance
-logger = Logger()
-simple_logger = Logger(simple=True)
+logger: Logger = Logger()
+simple_logger: Logger = Logger(simple=True)
 
 # test
 if __name__ == "__main__":

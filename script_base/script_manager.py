@@ -15,6 +15,7 @@ class ScriptManager:
             help="Available commands"
         )
         self.commands = {} # Store command instances
+        self.command_parsers = {} # Store subparser for each command
 
     def register_command(self, command_name: str, command_instance: 'Command', help_text: str = None):
         """
@@ -40,12 +41,65 @@ class ScriptManager:
         parser_command.add_argument("--debug", action="store_true", help="Enable debug logging for all commands.")
         command_instance.add_arguments(parser_command)
         self.commands[command_name] = command_instance
+        self.command_parsers[command_name] = parser_command
 
     def run(self):
         """
         Parse command-line arguments and execute the corresponding command.
         """
-        args = self.parser.parse_args()
+        import sys
+        import io
+        from contextlib import redirect_stderr
+        
+        # Analyze command line arguments to provide better error messages
+        args_list = sys.argv[1:]
+        
+        # Handle different error scenarios
+        if args_list and args_list[0] in self.commands:
+            # Valid subcommand provided, capture parsing errors for better messaging
+            subcommand = args_list[0]
+            captured_stderr = io.StringIO()
+            try:
+                with redirect_stderr(captured_stderr):
+                    args = self.parser.parse_args()
+            except SystemExit as e:
+                if e.code != 0:  # Error case
+                    # Extract error message from argparse output
+                    error_output = captured_stderr.getvalue()
+                    error_msg = ""
+                    for line in error_output.split('\n'):
+                        if ": error: " in line:
+                            error_msg = line.split(": error: ", 1)[1]
+                            break
+                    
+                    # Print cleaner error message
+                    logger.error(f"Error in '{subcommand}' command arguments: {error_msg}")
+                    # Print the usage section for the specific subcommand (concise, like the first lines of -h)
+                    try:
+                        subparser = self.command_parsers.get(subcommand)
+                        if subparser is not None:
+                            # Argparse prints to stdout by default; this shows only the 'usage:' lines
+                            subparser.print_usage()
+                    except Exception:
+                        # If anything goes wrong, fall back to generic guidance below
+                        pass
+                    logger.info(f"Use '{sys.argv[0]} {subcommand} --help' for more information on the '{subcommand}' command.")
+                raise  # Re-raise to maintain exit behavior
+        elif args_list and not args_list[0].startswith('-'):
+            # Unknown subcommand provided; show friendly message and concise usage
+            unknown_cmd = args_list[0]
+            logger.error(f"Unsupported command '{unknown_cmd}'.")
+            try:
+                # Show the top-level concise usage with the list of available commands
+                self.parser.print_usage()
+            except Exception:
+                pass
+            # Hint to get the full list and details
+            logger.info(f"Use '{sys.argv[0]} -h' to get supported commands.")
+            sys.exit(2)
+        else:
+            # Parse normally for other cases (no args, unknown command, global options)
+            args = self.parser.parse_args()
 
         if getattr(args, "debug", False):
             import logging

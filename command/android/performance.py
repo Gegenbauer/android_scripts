@@ -4,10 +4,12 @@ import re
 from command.android.base import AdbCommand
 from export_bitmaps import export_bitmaps
 from script_base.log import logger
+from script_base.platforms import current_platform
 from script_base.utils import (
     run_command,
     ensure_directory_exists,
-    timestamp)
+    timestamp
+)
 
 
 class DumpMemoryCommand(AdbCommand):
@@ -16,6 +18,7 @@ class DumpMemoryCommand(AdbCommand):
     """
 
     def add_custom_arguments(self, parser):
+        from script_base.env_setup import env, PathType
         parser.add_argument(
             "-p", "--package", help="Target application package name. If not provided, --focused must be used."
         )
@@ -31,7 +34,7 @@ class DumpMemoryCommand(AdbCommand):
         )
         parser.add_argument(
             "--cache-dir",
-            default=os.environ.get("cache_files_dir", "."),
+            default=env.get(PathType.CACHE),
             help="Local cache directory",
         )
 
@@ -55,7 +58,8 @@ class DumpMemoryCommand(AdbCommand):
             return
 
         ts = timestamp()
-        local_dir = str(os.path.join(args.cache_dir, "mem_dump", package_name, ts))
+        cache_dir = args.cache_dir
+        local_dir = str(os.path.join(cache_dir, "mem_dump", package_name, ts))
         ensure_directory_exists(local_dir)
         remote_hprof = f"/data/local/tmp/{package_name}_{ts}.hprof"
         local_hprof = os.path.join(local_dir, f"{package_name}_{ts}.hprof")
@@ -129,15 +133,10 @@ class ExportBitmapsCommand(AdbCommand):
 class DumpThreadStackCommand(AdbCommand):
     """
     Dump thread stack traces of a target Android app process and pull to local machine.
-    
-    This command captures thread stack information by:
-    1. Listing existing files in /data/anr/ directory
-    2. Sending SIGQUIT signal to target process to generate stack dump
-    3. Finding the newly created ANR file by comparing file lists
-    4. Pulling the ANR file to local cache directory
     """
 
     def add_custom_arguments(self, parser):
+        from script_base.env_setup import env, PathType
         parser.add_argument(
             "-p", "--package", 
             help="Target application package name. If not provided, --focused must be used."
@@ -149,11 +148,11 @@ class DumpThreadStackCommand(AdbCommand):
         )
         parser.add_argument(
             "--cache-dir",
-            default=os.environ.get("cache_files_dir", "."),
+            default=env.get(PathType.CACHE),
             help="Local cache directory"
         )
         parser.add_argument(
-            "--open-vscode",
+            "--open-in-vscode",
             action="store_true",
             help="Open the dumped stack file in VSCode instead of file manager"
         )
@@ -239,7 +238,8 @@ class DumpThreadStackCommand(AdbCommand):
             # Step 4: Prepare local directory and pull the file
             ts = timestamp()
             sanitized_package = package_name.replace(".", "_")
-            local_dir = os.path.join(args.cache_dir, "stack", f"{sanitized_package}_{ts}")
+            cache_dir = args.cache_dir
+            local_dir = os.path.join(cache_dir, "stack", f"{sanitized_package}")
             ensure_directory_exists(local_dir)
             
             local_anr_path = os.path.join(local_dir, f"{sanitized_package}_stack_{ts}.txt")
@@ -255,34 +255,26 @@ class DumpThreadStackCommand(AdbCommand):
             logger.info(f"Successfully pulled thread stack dump to: {local_anr_path}")
 
             # Step 5: Open the file
-            if args.open_vscode:
+            import script_base.utils as utils
+            if args.open_in_vscode:
                 logger.info("Opening stack dump in VSCode...")
-                try:
-                    run_command(["code", local_anr_path], check_output=False)
-                except Exception as e:
-                    logger.warning(f"Failed to open in VSCode: {e}. Opening in file manager instead.")
-                    import script_base.utils as utils
-                    utils.open_in_file_manager(local_anr_path)
+                current_platform.open_in_vscode(local_anr_path)
             else:
                 logger.info("Opening stack dump in file manager...")
-                import script_base.utils as utils
                 utils.open_in_file_manager(local_anr_path)
 
         except Exception as e:
-            logger.error(f"Failed to dump thread stack for {package_name}: {e}")
+            logger.error(f"Failed to dump thread stack for {package_name}: {e}", e)
             return
         
 
 class RecordSystemTraceCommand(AdbCommand):
     """
     Capture Android system traces using Perfetto's record_android_trace tool.
-    
-    This command downloads the official record_android_trace script if needed,
-    captures system traces for a specified duration, and provides options to
-    view the results in browser or file manager.
     """
 
     def add_custom_arguments(self, parser):
+        from script_base.env_setup import env, PathType
         parser.add_argument(
             "-t", "--duration", 
             type=int, 
@@ -296,7 +288,7 @@ class RecordSystemTraceCommand(AdbCommand):
         )
         parser.add_argument(
             "--cache-dir",
-            default=os.environ.get("cache_files_dir", "."),
+            default=env.get(PathType.CACHE),
             help="Local cache directory"
         )
         parser.add_argument(
@@ -327,7 +319,9 @@ class RecordSystemTraceCommand(AdbCommand):
         try:
             # Setup directories and paths
             import os
-            work_dir = os.path.join(args.cache_dir, "systraces")
+            # check cache_dir
+            cache_dir = args.cache_dir
+            work_dir = os.path.join(cache_dir, "systraces")
             ensure_directory_exists(work_dir)
             
             record_script_path = os.path.join(work_dir, "record_android_trace")
@@ -357,6 +351,7 @@ class RecordSystemTraceCommand(AdbCommand):
             
             # Prepare command
             cmd = [
+                "python",
                 record_script_path,
                 "--serial", android_util.get_connected_device_id(),
                 "-c", config_path,
@@ -374,18 +369,11 @@ class RecordSystemTraceCommand(AdbCommand):
             # Execute trace capture with proper signal handling
             capture_interrupted = False
             try:
-                import subprocess
                 import signal
                 import os
                 
                 # Create process without showing output by default
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.DEVNULL,  # Suppress record_android_trace output
-                    stderr=subprocess.DEVNULL,  # Suppress error output
-                    cwd=work_dir,
-                    preexec_fn=os.setsid  # Create new process group
-                )
+                process = current_platform.start_new_process(command=cmd, cwd=work_dir)
                 
                 def signal_handler(sig, frame):
                     nonlocal capture_interrupted
@@ -393,7 +381,7 @@ class RecordSystemTraceCommand(AdbCommand):
                     logger.info("Stopping trace capture...")
                     try:
                         # Send SIGTERM to the process group
-                        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                        current_platform.terminate_process(process)
                     except ProcessLookupError:
                         pass  # Process already terminated
                 
@@ -411,7 +399,7 @@ class RecordSystemTraceCommand(AdbCommand):
                     return
                     
             except Exception as e:
-                logger.error(f"Error during trace capture: {e}")
+                logger.error(f"Error during trace capture", e)
                 return
             
             # Check if trace file was created

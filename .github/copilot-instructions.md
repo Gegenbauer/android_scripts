@@ -47,12 +47,6 @@ You are GitHub Copilot. Please generate scripts according to the following requi
   - Directories: Use `ensure_directory_exists(path)` to ensure existence.
   - Logging: Use `logger in script_base.log: logger.info("This is a log message.")`.
 
-- Android Device Operations (Sample Conventions)
-  - ADB pull: `run_command(["adb", "pull", remote, local], check_output=False)`.
-  - Open file manager:
-    - macOS: `open path`; Windows: `explorer path`; Linux: `xdg-open path` (use `run_command`).
-  - Open VSCode: `run_command(["code", "-g", f"{file}:{line}"])`, line number optional.
-
 - Cache/Output Directory Conventions
   - The local cache root directory should first read the `cache_files_dir` environment variable, otherwise use the current directory `.`.
   - Recommended organization: `<cache_root>/<feature_name>/<sanitized_key>_<timestamp>/...`.

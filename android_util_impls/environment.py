@@ -3,6 +3,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 from script_base.log import logger
+from script_base.platforms import current_platform
 
 def get_android_sdk_path() -> str:
     """
@@ -13,10 +14,14 @@ def get_android_sdk_path() -> str:
     """
     sdk_path = os.environ.get("android_sdk_path", "")
     if not sdk_path:
-        logger.error("Please set the ANDROID_SDK_ROOT environment variable to point to the Android SDK installation directory.")
+        logger.error(
+            "Please set the android_sdk_path environment variable to point to the Android SDK installation directory.",
+            Exception("android_sdk_path not set")
+        )
     if not os.path.exists(sdk_path):
         logger.error(
-            f"The specified Android SDK path '{sdk_path}' does not exist. Please check if the path is correct."
+            f"The specified Android SDK path '{sdk_path}' does not exist. Please check if the path is correct.",
+            Exception("android_sdk_path does not exist")
         )
         return ""
     return sdk_path
@@ -34,7 +39,8 @@ def get_android_ndk_path() -> str:
     ndk_path = os.path.join(sdk_path, "ndk")
     if not os.path.exists(ndk_path):
         logger.error(
-            "Please make sure the Android NDK is installed and ANDROID_SDK_ROOT points to the correct directory."
+            "Please make sure the Android NDK is installed and android_sdk_path points to the correct directory.",
+            Exception("NDK not found")
         )
         return ""
     return ndk_path
@@ -52,7 +58,8 @@ def get_android_platform_tools_path() -> str:
     platform_tools_path = os.path.join(sdk_path, "platform-tools")
     if not os.path.exists(platform_tools_path):
         logger.error(
-            "Please make sure the Android SDK is installed and ANDROID_SDK_ROOT points to the correct directory."
+            "Please make sure the Android SDK is installed and android_sdk_path points to the correct directory.",
+            Exception("Platform tools not found")
         )
         return ""
     return platform_tools_path
@@ -72,7 +79,7 @@ def get_android_build_tools_path(version) -> str:
     # Traverse the build-tools directory to find the specified version. If there is 30.0.3 and the request is 30, consider it a match.
     if not os.path.exists(build_tools_path):
         logger.error(
-            "Please make sure the Android SDK is installed and ANDROID_SDK_ROOT points to the correct directory."
+            "Please make sure the Android SDK is installed and android_sdk_path points to the correct directory."
         )
         return ""
     for item in os.listdir(build_tools_path):
@@ -81,7 +88,8 @@ def get_android_build_tools_path(version) -> str:
             if os.path.exists(build_tools_path):
                 return build_tools_path
     logger.error(
-        f"Could not find the path for Android build tools version {version}. Please check if this version is installed."
+        f"Could not find the path for Android build tools version {version}. Please check if this version is installed.",
+        Exception("Build tools not found")
     )
     return ""
 
@@ -91,14 +99,17 @@ def get_adb_path(warning: bool=False) -> str:
     Returns:
         str: The path of the adb tool, or an empty string if not set.
     """
+    adb_file_name = current_platform.get_adb_file_name()
     adb_path = (
-        os.path.join(get_android_platform_tools_path(), "adb")
+        os.path.join(get_android_platform_tools_path(), adb_file_name)
         if get_android_platform_tools_path()
         else ""
     )
     if not adb_path or not os.path.exists(adb_path):
         if warning:
             logger.error(
-                "Please make sure the adb tool is installed and in the directory specified by ANDROID_PLATFORM_TOOLS_ROOT."
+                "Cannot find adb tool. " +
+                "Please make sure the Android SDK is installed and android_sdk_path points to the correct directory.",
+                Exception("adb not found")
             )
     return adb_path
