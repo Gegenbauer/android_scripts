@@ -875,19 +875,61 @@ class AndroidUtilBase:
             )
             return False
 
-    def check_permission(self, permission: str, package_name: str, device="") -> bool:
+    def revoke_permission(self, permission: str, package_name: str, device="") -> bool:
         """
-        Check if the specified permission has been granted to the device.
+        Revoke the specified permission from the specified application.
 
         Args:
+            permission (str): The permission to revoke.
+            package_name (str): The package name of the application to revoke the permission from.
             device (str): The ID of the device.
-            permission (str): The permission to check.
-            package_name (str): The package name of the application to check.
 
         Returns:
-            bool: Whether the permission has been granted.
+            bool: Whether the permission was successfully revoked.
         """
-        # TODO
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return False
+        try:
+            command = f"{adb_cmd} shell pm revoke {package_name} {permission}"
+            run_command(command, shell=True)
+            return True
+        except Exception as e:
+            logger.error(
+                f"Failed to revoke permission {permission} on device {device}: {e}", e
+            )
+            return False
+
+    def check_permission(self, permission: str, package_name: str, device="") -> dict:
+        """
+        Check the overall status of the specified permission for the specified application.
+
+        The result includes whether the permission is defined on the device, its
+        source package (declarer) and protection level, whether the app requests and
+        has been granted the permission, the app flags, and the platform-signature
+        status.
+
+        Args:
+            permission (str): The permission to check.
+            package_name (str): The package name of the application to check.
+            device (str): The ID of the device.
+
+        Returns:
+            dict: All available permission and package information, or an empty
+                dictionary if the adb command is unavailable.
+        """
+        adb_cmd = self.get_adb_command(device)
+        if not adb_cmd:
+            return {}
+
+        from android_util_impls.package_manager_util import check_permission
+
+        return check_permission(
+            adb_cmd,
+            package_name,
+            permission,
+            is_root=self.is_adb_running_as_root(device),
+        )
 
     def is_persistent_app(self, package_name: str, device="") -> bool:
         """
@@ -1353,7 +1395,7 @@ class AndroidUtilBase:
 
         try:
             command = f'{adb_command} shell pm path {package_name}'
-            result = run_command(command, check_output=True, shell=True)
+            result = run_command(command, check_output=True, shell=True, ignore_command_error=True)
             
             # Result format: package:/data/app/com.example.app/base.apk
             for line in result.splitlines():

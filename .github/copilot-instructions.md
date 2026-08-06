@@ -1,19 +1,20 @@
 # GitHub Copilot Prompt (Custom for this Repository)
 
 ---
-description: Conventions for scripts in python_scripts  
-applyTo: "python_scripts/**/*.py"
+description: Conventions for scripts in this repository
+applyTo: "**/*.py"
 ---
 
-Goal: When writing new scripts under `python_scripts/`, strictly follow the conventions below, always reusing the `script_base` base classes and utility functions. Overall style should reference `git.py`.
+Goal: When writing new scripts in this repository, strictly follow the conventions below, always reusing the `script_base` base classes and utility functions. Overall style should reference `git.py`.
 
 ---
 
 You are GitHub Copilot. Please generate scripts according to the following requirements:
 
 - Script Location
-  - All new scripts must be placed in the `python_scripts/` directory.
-  - The entry point must be `if __name__ == "__main__":`, using `ScriptManager` to register and run commands.
+  - New CLI commands must be placed in the `command/` directory (Android-related commands under `command/android/`, extending `AdbCommand` from `command.android.base`).
+  - Reusable device operations belong in `android_util_impls/` (e.g. `package_manager_util.py`, `activity_manager_util.py`).
+  - The entry point must be `if __name__ == "__main__":`, using `ScriptManager` to register and run commands (see the root `adb.py`).
 
 - Base Classes & Utilities (Must Reuse)
   - Import from `script_base`:
@@ -116,10 +117,10 @@ if __name__ == "__main__":
 ```
 
 - Reference Files (Read these first and follow their style)
-  - `python_scripts/script_base/script_manager.py`
-  - `python_scripts/script_base/utils.py`
-  - `python_scripts/script_base/script_impl_sample.py`
-  - `python_scripts/git.py` (for style, structure, error handling)
+  - `script_base/script_manager.py`
+  - `script_base/utils.py`
+  - `script_base/script_impl_sample.py`
+  - `git.py` (for style, structure, error handling)
 
 - Pre-commit Checklist
   - [ ] Uses ScriptManager/Command system
